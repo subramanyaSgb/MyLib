@@ -271,7 +271,7 @@ function Row({ it, onChanged }: { it: Item; onChanged: () => void }) {
 
         {it.subCoverage.length > 0 && <SubCoverageBadge hits={it.subCoverage} />}
 
-        {it.externalDeal && it.externalDeal.bestPriceCents < curCents && (
+        {it.externalDeal && (
           <DealBadge deal={it.externalDeal} currentCents={curCents} />
         )}
       </div>
@@ -393,8 +393,12 @@ function SubCoverageBadge({ hits }: { hits: SubCoverage[] }) {
 
 function DealBadge({ deal, currentCents }: { deal: ExternalDeal; currentCents: number }) {
   const saving = currentCents - deal.bestPriceCents;
-  const savingPct = currentCents > 0 ? Math.round((saving / currentCents) * 100) : 0;
+  const cheaper = saving > 0;
+  const same = saving === 0;
+  const savingPct = currentCents > 0 && cheaper ? Math.round((saving / currentCents) * 100) : 0;
   const atHistoricalLow = deal.historicalLowCents != null && deal.bestPriceCents <= deal.historicalLowCents;
+  const eyebrow = cheaper ? "Cheaper on" : same ? "Also on" : "ITAD: cheapest is";
+  const priceColor = cheaper ? "#64d38c" : same ? "var(--text)" : "var(--text-soft)";
   return (
     <div
       style={{
@@ -408,22 +412,29 @@ function DealBadge({ deal, currentCents }: { deal: ExternalDeal; currentCents: n
         gap: 10,
         fontSize: 11.5,
         fontFamily: "var(--font-sans)",
+        flexWrap: "wrap",
       }}
     >
       <span style={{ color: "var(--text-faint)", letterSpacing: 1, textTransform: "uppercase", fontSize: 9 }}>
-        Cheaper on
+        {eyebrow}
       </span>
       <span style={{ color: "var(--text)", fontWeight: 600 }}>{deal.bestShopName}</span>
-      <span className="tnum" style={{ color: "#64d38c", fontWeight: 700 }}>
+      <span className="tnum" style={{ color: priceColor, fontWeight: 700 }}>
         {fmtPrice(deal.bestPriceCents, deal.currency ?? null)}
       </span>
-      <span style={{ color: "var(--text-faint)" }}>
-        save {fmtPrice(saving, deal.currency ?? null)} ({savingPct}%)
-      </span>
+      {cheaper && (
+        <span style={{ color: "var(--text-faint)" }}>
+          save {fmtPrice(saving, deal.currency ?? null)} ({savingPct}%)
+        </span>
+      )}
+      {!cheaper && deal.historicalLowCents != null && (
+        <span style={{ color: "var(--text-faint)" }}>
+          ATL {fmtPrice(deal.historicalLowCents, deal.currency ?? null)}
+        </span>
+      )}
       {atHistoricalLow && (
         <span
           style={{
-            marginLeft: "auto",
             fontSize: 9,
             letterSpacing: 1,
             textTransform: "uppercase",
@@ -431,7 +442,7 @@ function DealBadge({ deal, currentCents }: { deal: ExternalDeal; currentCents: n
             fontWeight: 700,
           }}
         >
-          ★ All-time low
+          ★ At all-time low
         </span>
       )}
       {deal.bestUrl && (
@@ -440,7 +451,7 @@ function DealBadge({ deal, currentCents }: { deal: ExternalDeal; currentCents: n
           target="_blank"
           rel="noopener noreferrer"
           style={{
-            marginLeft: atHistoricalLow ? 12 : "auto",
+            marginLeft: "auto",
             color: "var(--accent)",
             textDecoration: "none",
             fontSize: 11,
