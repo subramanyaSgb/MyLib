@@ -1,17 +1,21 @@
 import { prisma } from "@/lib/db";
 import { PageHeader } from "@/lib/design/primitives";
 import { WishlistView } from "./wishlist-view";
+import { getSubCoverageForWishlist } from "@/lib/subscriptions";
 
 export const dynamic = "force-dynamic";
 
 export default async function WishlistPage() {
-  const items = await prisma.wishlistItem.findMany({
-    orderBy: [{ isOnSale: "desc" }, { discountPct: "desc" }, { title: "asc" }],
-    include: {
-      account: { select: { id: true, storeId: true, label: true, displayName: true } },
-      externalDeal: true,
-    },
-  });
+  const [items, subCoverage] = await Promise.all([
+    prisma.wishlistItem.findMany({
+      orderBy: [{ isOnSale: "desc" }, { discountPct: "desc" }, { title: "asc" }],
+      include: {
+        account: { select: { id: true, storeId: true, label: true, displayName: true } },
+        externalDeal: true,
+      },
+    }),
+    getSubCoverageForWishlist(),
+  ]);
 
   const onSaleCount = items.filter((i) => i.isOnSale).length;
   const belowTargetCount = items.filter(
@@ -63,6 +67,10 @@ export default async function WishlistPage() {
                 currency: i.externalDeal.currency,
               }
             : null,
+          subCoverage: (subCoverage[i.id] ?? []).map((h) => ({
+            subscriptionId: h.subscriptionId,
+            subscriptionName: h.subscriptionName,
+          })),
         }))}
       />
     </div>

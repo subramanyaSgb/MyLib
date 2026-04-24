@@ -16,6 +16,11 @@ type ExternalDeal = {
   currency: string | null;
 };
 
+type SubCoverage = {
+  subscriptionId: string;
+  subscriptionName: string;
+};
+
 type Item = {
   id: string;
   storeId: string;
@@ -32,6 +37,7 @@ type Item = {
   accountLabel: string;
   addedAt: string;
   externalDeal: ExternalDeal | null;
+  subCoverage: SubCoverage[];
 };
 
 function fmtPrice(cents: number | null, currency: string | null): string {
@@ -263,6 +269,8 @@ function Row({ it, onChanged }: { it: Item; onChanged: () => void }) {
           <span>{fmtPrice(fullCents, it.currency)} full</span>
         </div>
 
+        {it.subCoverage.length > 0 && <SubCoverageBadge hits={it.subCoverage} />}
+
         {it.externalDeal && it.externalDeal.bestPriceCents < curCents && (
           <DealBadge deal={it.externalDeal} currentCents={curCents} />
         )}
@@ -347,6 +355,38 @@ function Row({ it, onChanged }: { it: Item; onChanged: () => void }) {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function SubCoverageBadge({ hits }: { hits: SubCoverage[] }) {
+  const label = hits.length === 1
+    ? hits[0].subscriptionName
+    : `${hits[0].subscriptionName} +${hits.length - 1} more`;
+  return (
+    <div
+      title={hits.map((h) => h.subscriptionName).join(", ")}
+      style={{
+        marginTop: 8,
+        padding: "6px 10px",
+        border: "1px solid #1e5f38",
+        borderRadius: 6,
+        background: "rgba(46, 125, 70, 0.12)",
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        fontSize: 11.5,
+        fontFamily: "var(--font-sans)",
+        color: "#64d38c",
+      }}
+    >
+      <span style={{ fontSize: 9, letterSpacing: 1.5, textTransform: "uppercase", fontWeight: 700 }}>
+        Already on your subscription
+      </span>
+      <span style={{ fontWeight: 600 }}>{label}</span>
+      <span style={{ marginLeft: "auto", color: "var(--text-faint)", fontSize: 10.5 }}>
+        Don't buy — stream it
+      </span>
     </div>
   );
 }

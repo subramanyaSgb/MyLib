@@ -1,14 +1,42 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PageHeader, Toggle } from "@/lib/design/primitives";
+
+type Sub = {
+  id: string;
+  name: string;
+  storeHint: string | null;
+  monthlyCostCents: number | null;
+  currency: string | null;
+  isActive: boolean;
+  refreshedAt: string | null;
+  catalogSize: number;
+};
 
 export default function SettingsPage() {
   const [autoSync, setAutoSync] = useState(true);
   const [notifyDup, setNotifyDup] = useState(true);
   const [notifySale, setNotifySale] = useState(false);
   const [analytics, setAnalytics] = useState(false);
+  const [subs, setSubs] = useState<Sub[]>([]);
+
+  useEffect(() => {
+    fetch("/api/subs")
+      .then((r) => r.json())
+      .then((j: { subs: Sub[] }) => setSubs(j.subs))
+      .catch(() => setSubs([]));
+  }, []);
+
+  async function toggleSub(id: string, isActive: boolean) {
+    setSubs((xs) => xs.map((x) => (x.id === id ? { ...x, isActive } : x)));
+    await fetch(`/api/subs/${id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ isActive }),
+    });
+  }
 
   return (
     <div>
@@ -43,6 +71,29 @@ export default function SettingsPage() {
               Replay
             </Link>
           </Row>
+        </Group>
+
+        <Group title="Subscriptions you pay for">
+          <div style={{ padding: "10px 18px 4px", fontSize: 11.5, color: "var(--text-faint)", lineHeight: 1.5 }}>
+            Flip on the ones you already subscribe to. Playdex will flag wishlist games inside those catalogs so you don't double-pay.
+          </div>
+          {subs.length === 0 && (
+            <div style={{ padding: "14px 18px", fontSize: 12, color: "var(--text-faint)" }}>Loading…</div>
+          )}
+          {subs.map((s) => {
+            const monthly = s.monthlyCostCents != null
+              ? ` · ${s.currency === "USD" ? "$" : s.currency ? `${s.currency} ` : "$"}${(s.monthlyCostCents / 100).toFixed(2).replace(/\.00$/, "")}/mo`
+              : "";
+            return (
+              <Row
+                key={s.id}
+                label={s.name}
+                sub={`${s.catalogSize} games in catalog${monthly}${s.refreshedAt ? ` · refreshed ${new Date(s.refreshedAt).toLocaleDateString()}` : " · catalog empty — upload via PUT /api/subs/" + s.id + "/catalog"}`}
+              >
+                <Toggle on={s.isActive} onChange={(v) => toggleSub(s.id, v)} />
+              </Row>
+            );
+          })}
         </Group>
 
         <Group title="Notifications">

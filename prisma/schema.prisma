@@ -208,6 +208,37 @@ model ExternalDeal {
   @@index([wishlistItemId])
 }
 
+/// A subscription service (Xbox Game Pass PC, PS Plus Extra, EA Play…).
+/// Users flip `isActive` to say which subs they already pay for; Playdex then
+/// flags any wishlisted or owned game that falls inside those catalogs.
+model Subscription {
+  id         String  @id // slug, e.g. "gamepass-pc"
+  name       String
+  storeHint  String? // primary store the sub belongs to (informational)
+  monthlyCostCents Int?
+  currency   String?
+  isActive   Boolean @default(false)
+  refreshedAt DateTime?
+  catalog    SubCatalogEntry[]
+}
+
+/// One title inside a subscription catalog. De-normalized title stored for
+/// display; `normTitle` used for matching against Game + WishlistItem titles.
+model SubCatalogEntry {
+  id             String @id @default(cuid())
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  title          String
+  normTitle      String
+  /// Optional external id (Xbox BigCatId, PS Store id) for deep-linking.
+  externalId     String?
+  url            String?
+  coverUrl       String?
+
+  @@unique([subscriptionId, normTitle])
+  @@index([normTitle])
+}
+
 /// Free-to-claim offer from Epic / GOG / other stores. Refreshed by a sync job.
 model FreeOffer {
   id          String   @id @default(cuid())
