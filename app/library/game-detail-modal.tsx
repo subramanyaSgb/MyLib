@@ -1,20 +1,26 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Cover } from "@/lib/design/cover";
 import { Btn, StoreDot, Icon } from "@/lib/design/primitives";
 import type { DerivedAccount, DerivedGame } from "@/lib/design/derived";
 import { STORE_PALETTE } from "@/lib/store-meta";
+import { playStateColor, playStateLabel } from "./library-view";
+
+const PLAY_STATES = ["backlog", "playing", "done", "dropped"] as const;
+type PlayState = (typeof PLAY_STATES)[number];
 
 export function GameDetailModal({
   game,
   accounts,
+  allTags,
   onClose,
   onMerge,
 }: {
   game: DerivedGame;
   accounts: DerivedAccount[];
+  allTags: Array<{ id: string; name: string; color: string | null }>;
   onClose: () => void;
   onMerge: () => void;
 }) {
@@ -47,6 +53,56 @@ export function GameDetailModal({
       method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ isHidden: !game.isHidden }),
+    });
+    router.refresh();
+  }
+
+  async function setPlayState(next: PlayState | null) {
+    await fetch(`/api/games/${game.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ playState: next }),
+    });
+    router.refresh();
+  }
+
+  const [tagDraft, setTagDraft] = useState("");
+  const [tagBusy, setTagBusy] = useState(false);
+  const currentTagIds = new Set(game.userTags.map((t) => t.id));
+
+  async function toggleTag(tagId: string) {
+    const next = new Set(currentTagIds);
+    if (next.has(tagId)) next.delete(tagId);
+    else next.add(tagId);
+    await fetch(`/api/games/${game.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ tagIds: [...next] }),
+    });
+    router.refresh();
+  }
+
+  async function createTagAndApply() {
+    const name = tagDraft.trim();
+    if (!name) return;
+    setTagBusy(true);
+    const res = await fetch("/api/tags", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    setTagBusy(false);
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      alert(typeof j.error === "string" ? j.error : "Failed to create tag");
+      return;
+    }
+    const { tag } = await res.json();
+    setTagDraft("");
+    await fetch(`/api/games/${game.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ tagIds: [...currentTagIds, tag.id] }),
     });
     router.refresh();
   }
@@ -150,6 +206,104 @@ export function GameDetailModal({
                 </Btn>
               </div>
             )}
+
+            {/* Play state */}
+            <div style={{ marginTop: 24 }}>
+              <div className="eyebrow" style={{ marginBottom: 8 }}>Play state</div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {PLAY_STATES.map((s) => {
+                  const active = game.playState === s;
+                  const col = playStateColor(s);
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setPlayState(active ? null : s)}
+                      style={{
+                        padding: "5px 12px",
+                        fontSize: 11.5,
+                        fontWeight: 600,
+                        letterSpacing: 0.5,
+                        borderRadius: 99,
+                        border: `1px solid ${active ? col : "var(--border)"}`,
+                        background: active ? col : "transparent",
+                        color: active ? "#0b0b0f" : "var(--text-soft)",
+                        cursor: "pointer",
+                        fontFamily: "var(--font-sans)",
+                      }}
+                    >
+                      {playStateLabel(s)}
+                    </button>
+                  );
+                })}
+                {game.playState && (
+                  <button
+                    type="button"
+                    onClick={() => setPlayState(null)}
+                    style={{
+                      padding: "5px 10px",
+                      fontSize: 11,
+                      background: "transparent",
+                      border: "none",
+                      color: "var(--text-faint)",
+                      cursor: "pointer",
+                      fontFamily: "var(--font-sans)",
+                    }}
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Tags */}
+            <div style={{ marginTop: 20 }}>
+              <div className="eyebrow" style={{ marginBottom: 8 }}>Tags</div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                {allTags.map((t) => {
+                  const active = currentTagIds.has(t.id);
+                  const col = t.color ?? "var(--accent)";
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => toggleTag(t.id)}
+                      style={{
+                        padding: "4px 10px",
+                        fontSize: 11.5,
+                        borderRadius: 99,
+                        border: `1px solid ${active ? col : "var(--border)"}`,
+                        background: active ? `${col}22` : "transparent",
+                        color: active ? col : "var(--text-soft)",
+                        cursor: "pointer",
+                        fontFamily: "var(--font-sans)",
+                      }}
+                    >
+                      # {t.name}
+                    </button>
+                  );
+                })}
+                <input
+                  value={tagDraft}
+                  onChange={(e) => setTagDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") { e.preventDefault(); createTagAndApply(); }
+                  }}
+                  placeholder={allTags.length === 0 ? "Type a tag name and press Enter…" : "+ new tag"}
+                  disabled={tagBusy}
+                  style={{
+                    padding: "4px 10px",
+                    fontSize: 11.5,
+                    borderRadius: 99,
+                    border: "1px dashed var(--border)",
+                    background: "transparent",
+                    color: "var(--text)",
+                    fontFamily: "var(--font-sans)",
+                    minWidth: 140,
+                  }}
+                />
+              </div>
+            </div>
 
             {/* Copies list */}
             <div style={{ marginTop: 24 }}>

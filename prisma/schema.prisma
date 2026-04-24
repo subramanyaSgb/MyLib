@@ -59,6 +59,8 @@ model Game {
   cloudXcloud Boolean @default(false)
   /// Last time we cross-referenced this game against cloud catalogs.
   lastCloudCheckAt DateTime?
+  /// Play status set by user. Values: "backlog" | "playing" | "done" | "dropped" | null.
+  playState  String?
   isFavorite Boolean  @default(false)
   isHidden   Boolean  @default(false)
   /// When set, treats this Game as "merged" — only the OwnedCopy belonging to
@@ -69,10 +71,12 @@ model Game {
 
   copies      GameOnStore[]
   wishlistItems WishlistItem[]
+  tags        GameTag[]
 
   @@index([normTitle])
   @@index([isFavorite])
   @@index([isHidden])
+  @@index([playState])
 }
 
 /// A game as it exists on a specific store (has store-specific IDs/art).
@@ -141,4 +145,25 @@ model WishlistItem {
   @@index([accountId])
   @@index([gameId])
   @@index([isOnSale])
+}
+
+/// User-created label applied to games ("backlog pile", "coop with Priya", etc.).
+model Tag {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  /// Optional accent color (hex, e.g. "#7c5cff").
+  color     String?
+  createdAt DateTime @default(now())
+  games     GameTag[]
+}
+
+/// Many-to-many join.
+model GameTag {
+  gameId String
+  tagId  String
+  game   Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  tag    Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([gameId, tagId])
+  @@index([tagId])
 }

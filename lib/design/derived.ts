@@ -30,6 +30,9 @@ export type DerivedGame = {
   genre: string | null;
   year: number | null;
   tags: string[];
+  /** User-created tags (not auto-derived store tags). */
+  userTags: Array<{ id: string; name: string; color: string | null }>;
+  playState: "backlog" | "playing" | "done" | "dropped" | null;
   coverUrl: string | null;
   isFavorite: boolean;
   isHidden: boolean;
@@ -99,6 +102,8 @@ export async function getGames(filters?: {
   showHidden?: boolean;
   genre?: string;
   cloudOnly?: "gfn" | "xcloud" | "any";
+  playState?: "backlog" | "playing" | "done" | "dropped";
+  tagId?: string;
 }): Promise<DerivedGame[]> {
   const games = await prisma.game.findMany({
     where: {
@@ -109,6 +114,8 @@ export async function getGames(filters?: {
       ...(filters?.cloudOnly === "gfn" ? { cloudGfn: true } : {}),
       ...(filters?.cloudOnly === "xcloud" ? { cloudXcloud: true } : {}),
       ...(filters?.cloudOnly === "any" ? { OR: [{ cloudGfn: true }, { cloudXcloud: true }] } : {}),
+      ...(filters?.playState ? { playState: filters.playState } : {}),
+      ...(filters?.tagId ? { tags: { some: { tagId: filters.tagId } } } : {}),
     },
     include: {
       copies: {
@@ -116,6 +123,7 @@ export async function getGames(filters?: {
           owned: { include: { account: { select: { id: true, storeId: true } } } },
         },
       },
+      tags: { include: { tag: true } },
     },
   });
 
@@ -150,6 +158,11 @@ export async function getGames(filters?: {
           if (Array.isArray(v)) tags = v.map(String);
         } catch { /* ignore */ }
       }
+      const userTags = (g.tags ?? []).map((gt) => ({
+        id: gt.tag.id,
+        name: gt.tag.name,
+        color: gt.tag.color,
+      }));
       return {
         id: g.id,
         title: g.title,
@@ -157,6 +170,8 @@ export async function getGames(filters?: {
         genre: g.genre,
         year: g.releaseYear,
         tags,
+        userTags,
+        playState: (g.playState as DerivedGame["playState"]) ?? null,
         coverUrl: g.coverUrl,
         isFavorite: g.isFavorite,
         isHidden: g.isHidden,
@@ -196,6 +211,27 @@ export function computeTotals(games: DerivedGame[]): DerivedTotals {
     unplayed: games.filter((g) => g.allOwners.every((o) => o.hours === 0)),
     dupeSavings: duplicates.reduce((t, g) => t + (g.allOwners.length - 1) * g.price, 0),
   };
+}
+
+/** All user-created tags with game counts. */
+export async function getAllTags(): Promise<Array<{ id: string; name: string; color: string | null; gameCount: number }>> {
+  const rows = await prisma.tag.findMany({
+    orderBy: { name: "asc" },
+    include: { _count: { select: { games: true } } },
+  });
+  return rows.map((r) => ({ id: r.id, name: r.name, color: r.color, gameCount: r._count.games }));
+}
+
+/** Play-state distribution across visible library. */
+export async function getPlayStateCounts(): Promise<Record<string, number>> {
+  const rows = await prisma.game.groupBy({
+    by: ["playState"],
+    where: { isHidden: false, copies: { some: { owned: { some: {} } } } },
+    _count: { _all: true },
+  });
+  const out: Record<string, number> = {};
+  for (const r of rows) if (r.playState) out[r.playState] = r._count._all;
+  return out;
 }
 
 /** Top N genres present in the library, with game counts. */

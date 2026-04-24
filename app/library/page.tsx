@@ -1,4 +1,4 @@
-import { getAccounts, getGames, computeTotals, getTopGenres } from "@/lib/design/derived";
+import { getAccounts, getGames, computeTotals, getTopGenres, getAllTags, getPlayStateCounts } from "@/lib/design/derived";
 import { LibraryView } from "./library-view";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +18,8 @@ export default async function LibraryPage({
     showHidden?: string;
     duplicatesOnly?: string;
     cloud?: "gfn" | "xcloud" | "any";
+    playState?: "backlog" | "playing" | "done" | "dropped";
+    tag?: string;
     game?: string;
     merge?: string;
   }>;
@@ -33,11 +35,13 @@ export default async function LibraryPage({
     showHidden: sp.showHidden === "1",
     duplicatesOnly: sp.duplicatesOnly === "1",
     cloud: sp.cloud ?? "",
+    playState: sp.playState ?? "",
+    tag: sp.tag ?? "",
     sort: sp.sort ?? "title",
     view: sp.view ?? "grid",
   } as const;
 
-  const [accounts, games, topGenres] = await Promise.all([
+  const [accounts, games, topGenres, allTags, playCounts] = await Promise.all([
     getAccounts(),
     getGames({
       q: filters.q || undefined,
@@ -48,8 +52,12 @@ export default async function LibraryPage({
       favoritesOnly: filters.favoritesOnly,
       showHidden: filters.showHidden,
       cloudOnly: filters.cloud as "gfn" | "xcloud" | "any" | undefined,
+      playState: filters.playState as "backlog" | "playing" | "done" | "dropped" | undefined,
+      tagId: filters.tag || undefined,
     }),
     getTopGenres(8),
+    getAllTags(),
+    getPlayStateCounts(),
   ]);
 
   // Apply remaining filters not handled in DB layer
@@ -89,6 +97,8 @@ export default async function LibraryPage({
       accounts={accounts}
       filters={filters}
       topGenres={topGenres}
+      allTags={allTags}
+      playCounts={playCounts}
       openGameId={sp.game ?? null}
       openMergeId={sp.merge ?? null}
     />

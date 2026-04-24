@@ -251,6 +251,68 @@ export function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boo
   );
 }
 
+// ── CloudBadge ─────────────────────────────────────────────────────────────
+// Cloud-gaming service badge: brand icon on a black circle. Xbox SVG is
+// inlined because simple-icons doesn't carry it (trademark).
+export function CloudBadge({ service, size = 16, title }: { service: "gfn" | "xcloud"; size?: number; title?: string }) {
+  const name = service === "gfn" ? "GeForce Now" : "Xbox Cloud Gaming";
+  const color = service === "gfn" ? "#76b900" : "#9bf00b";
+  const iconSize = Math.round(size * 0.7);
+  return (
+    <span
+      title={title ?? name}
+      aria-label={name}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: size,
+        height: size,
+        borderRadius: 99,
+        background: "rgba(0,0,0,0.78)",
+        flexShrink: 0,
+        boxShadow: "0 1px 3px rgba(0,0,0,0.5)",
+      }}
+    >
+      {service === "gfn" ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={`https://cdn.simpleicons.org/nvidia/${color.replace("#", "")}`}
+          alt=""
+          width={iconSize}
+          height={iconSize}
+          style={{ display: "block", width: iconSize, height: iconSize }}
+          loading="lazy"
+        />
+      ) : (
+        <XboxLogo size={iconSize} color={color} />
+      )}
+    </span>
+  );
+}
+
+function XboxLogo({ size, color }: { size: number; color: string }) {
+  // Xbox sphere monogram — two crossed arcs inside a circle. Public-domain
+  // representation (not an official mark).
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={2.2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ display: "block" }}
+    >
+      <circle cx="12" cy="12" r="10" />
+      <path d="M4.5 5.5 Q 12 12 20 18.5" />
+      <path d="M4 18.5 Q 12 12 19.5 5.5" />
+    </svg>
+  );
+}
+
 // ── PageHeader ─────────────────────────────────────────────────────────────
 export function PageHeader({
   eyebrow, title, subtitle, right,

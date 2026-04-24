@@ -1,17 +1,32 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { Cover } from "@/lib/design/cover";
-import { PageHeader } from "@/lib/design/primitives";
+import { Chip, CloudBadge, PageHeader } from "@/lib/design/primitives";
 import { CloudRefreshButton } from "./refresh-button";
 
 export const dynamic = "force-dynamic";
 
-export default async function CloudPage() {
+type ServiceFilter = "all" | "gfn" | "xcloud" | "both";
+
+export default async function CloudPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ service?: ServiceFilter }>;
+}) {
+  const sp = await searchParams;
+  const service: ServiceFilter = sp.service ?? "all";
+
+  const whereCloud =
+    service === "gfn" ? { cloudGfn: true }
+    : service === "xcloud" ? { cloudXcloud: true }
+    : service === "both" ? { AND: [{ cloudGfn: true }, { cloudXcloud: true }] }
+    : { OR: [{ cloudGfn: true }, { cloudXcloud: true }] };
+
   const games = await prisma.game.findMany({
     where: {
       isHidden: false,
       copies: { some: { owned: { some: {} } } },
-      OR: [{ cloudGfn: true }, { cloudXcloud: true }],
+      ...whereCloud,
     },
     orderBy: { title: "asc" },
     select: {
@@ -24,14 +39,33 @@ export default async function CloudPage() {
     },
   });
 
+  // Totals per service for chip counts
+  const totalGfn = await prisma.game.count({
+    where: { isHidden: false, copies: { some: { owned: { some: {} } } }, cloudGfn: true },
+  });
+  const totalXcloud = await prisma.game.count({
+    where: { isHidden: false, copies: { some: { owned: { some: {} } } }, cloudXcloud: true },
+  });
+  const totalBoth = await prisma.game.count({
+    where: {
+      isHidden: false,
+      copies: { some: { owned: { some: {} } } },
+      AND: [{ cloudGfn: true }, { cloudXcloud: true }],
+    },
+  });
+  const totalAny = await prisma.game.count({
+    where: {
+      isHidden: false,
+      copies: { some: { owned: { some: {} } } },
+      OR: [{ cloudGfn: true }, { cloudXcloud: true }],
+    },
+  });
+
   const lastCheck = await prisma.game.findFirst({
     where: { lastCloudCheckAt: { not: null } },
     orderBy: { lastCloudCheckAt: "desc" },
     select: { lastCloudCheckAt: true },
   });
-
-  const gfnCount = games.filter((g) => g.cloudGfn).length;
-  const xcloudCount = games.filter((g) => g.cloudXcloud).length;
 
   return (
     <div>
@@ -46,12 +80,37 @@ export default async function CloudPage() {
           </>
         }
         subtitle={
-          games.length === 0
+          totalAny === 0
             ? "Run a refresh to cross-reference your library against GeForce Now + Xbox Cloud."
-            : `${gfnCount} on GeForce Now · ${xcloudCount} on Xbox Cloud Gaming. ${lastCheck?.lastCloudCheckAt ? `Last checked ${new Date(lastCheck.lastCloudCheckAt).toLocaleString()}.` : ""}`
+            : `${totalGfn} on GeForce Now · ${totalXcloud} on Xbox Cloud · ${totalBoth} on both. ${lastCheck?.lastCloudCheckAt ? `Last checked ${new Date(lastCheck.lastCloudCheckAt).toLocaleString()}.` : ""}`
         }
         right={<CloudRefreshButton />}
       />
+
+      {/* Service filter chips */}
+      <div
+        style={{
+          padding: "14px 40px",
+          display: "flex",
+          gap: 8,
+          flexWrap: "wrap",
+          alignItems: "center",
+          borderBottom: "1px solid var(--border-soft)",
+        }}
+      >
+        <ServiceChip href="/cloud" active={service === "all"} count={totalAny}>
+          Any cloud
+        </ServiceChip>
+        <ServiceChip href="/cloud?service=gfn" active={service === "gfn"} count={totalGfn}>
+          <CloudBadge service="gfn" size={12} /> GeForce Now
+        </ServiceChip>
+        <ServiceChip href="/cloud?service=xcloud" active={service === "xcloud"} count={totalXcloud}>
+          <CloudBadge service="xcloud" size={12} /> Xbox Cloud
+        </ServiceChip>
+        <ServiceChip href="/cloud?service=both" active={service === "both"} count={totalBoth}>
+          On both
+        </ServiceChip>
+      </div>
 
       {games.length === 0 ? (
         <div
@@ -63,8 +122,7 @@ export default async function CloudPage() {
             color: "var(--text-faint)",
           }}
         >
-          No matches yet. Click <strong>Refresh cloud catalogs</strong> above to scan. NVIDIA&apos;s
-          public catalog endpoint may be empty in some regions.
+          No matches for this filter.
         </div>
       ) : (
         <div
@@ -84,39 +142,9 @@ export default async function CloudPage() {
             >
               <div style={{ position: "relative" }}>
                 <Cover game={{ title: g.title, dev: g.dev, coverUrl: g.coverUrl }} w="100%" h={240} radius={5} />
-                <div style={{ position: "absolute", bottom: 8, left: 8, display: "flex", gap: 4 }}>
-                  {g.cloudGfn && (
-                    <span
-                      style={{
-                        padding: "2px 6px",
-                        fontSize: 9,
-                        fontWeight: 700,
-                        letterSpacing: 0.5,
-                        background: "#76b900",
-                        color: "#0d1700",
-                        borderRadius: 3,
-                        fontFamily: "var(--font-sans)",
-                      }}
-                    >
-                      GFN
-                    </span>
-                  )}
-                  {g.cloudXcloud && (
-                    <span
-                      style={{
-                        padding: "2px 6px",
-                        fontSize: 9,
-                        fontWeight: 700,
-                        letterSpacing: 0.5,
-                        background: "#107c10",
-                        color: "#fff",
-                        borderRadius: 3,
-                        fontFamily: "var(--font-sans)",
-                      }}
-                    >
-                      xCloud
-                    </span>
-                  )}
+                <div style={{ position: "absolute", bottom: 8, left: 8, display: "flex", gap: 6, alignItems: "center" }}>
+                  {g.cloudGfn && <CloudBadge service="gfn" size={16} />}
+                  {g.cloudXcloud && <CloudBadge service="xcloud" size={16} />}
                 </div>
               </div>
               <div
@@ -138,5 +166,28 @@ export default async function CloudPage() {
         </div>
       )}
     </div>
+  );
+}
+
+function ServiceChip({
+  href,
+  active,
+  count,
+  children,
+}: {
+  href: string;
+  active: boolean;
+  count: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link href={href} style={{ textDecoration: "none" }}>
+      <Chip active={active}>
+        {children}{" "}
+        <span style={{ opacity: 0.6, marginLeft: 2 }} className="tnum">
+          {count}
+        </span>
+      </Chip>
+    </Link>
   );
 }

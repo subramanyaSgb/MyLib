@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Cover } from "@/lib/design/cover";
-import { Btn, Chip, Icon, PageHeader, StoreDot } from "@/lib/design/primitives";
+import { Btn, Chip, CloudBadge, Icon, PageHeader, StoreDot } from "@/lib/design/primitives";
 import type { DerivedAccount, DerivedGame } from "@/lib/design/derived";
 import { STORE_PALETTE } from "@/lib/store-meta";
 import { GameDetailModal } from "./game-detail-modal";
@@ -19,6 +19,8 @@ type Filters = {
   showHidden: boolean;
   duplicatesOnly: boolean;
   cloud: "" | "gfn" | "xcloud" | "any";
+  playState: "" | "backlog" | "playing" | "done" | "dropped";
+  tag: string;
   sort: "title" | "recent" | "playtime" | "copies";
   view: "grid" | "list";
 };
@@ -31,6 +33,8 @@ export function LibraryView({
   accounts,
   filters,
   topGenres,
+  allTags,
+  playCounts,
   openGameId,
   openMergeId,
 }: {
@@ -41,6 +45,8 @@ export function LibraryView({
   accounts: DerivedAccount[];
   filters: Filters;
   topGenres: Array<{ genre: string; count: number }>;
+  allTags: Array<{ id: string; name: string; color: string | null; gameCount: number }>;
+  playCounts: Record<string, number>;
   openGameId: string | null;
   openMergeId: string | null;
 }) {
@@ -97,7 +103,7 @@ export function LibraryView({
     : `${allCount} unique games · ${totalsCopies} copies · ${accounts.length} accounts`;
 
   const anyFilter =
-    filters.storeId || filters.accountId || filters.genre || filters.played !== "all" || filters.favoritesOnly || filters.duplicatesOnly || filters.cloud;
+    filters.storeId || filters.accountId || filters.genre || filters.played !== "all" || filters.favoritesOnly || filters.duplicatesOnly || filters.cloud || filters.playState || filters.tag;
 
   const openGame_ = openGameId ? games.find((g) => g.id === openGameId) ?? null : null;
   const openMerge_ = openMergeId ? games.find((g) => g.id === openMergeId) ?? null : null;
@@ -195,14 +201,41 @@ export function LibraryView({
           active={filters.cloud === "gfn"}
           onClick={() => setParam("cloud", filters.cloud === "gfn" ? null : "gfn")}
         >
-          On GeForce Now
+          <CloudBadge service="gfn" size={12} /> GeForce Now
         </Chip>
         <Chip
           active={filters.cloud === "xcloud"}
           onClick={() => setParam("cloud", filters.cloud === "xcloud" ? null : "xcloud")}
         >
-          On xCloud
+          <CloudBadge service="xcloud" size={12} /> Xbox Cloud
         </Chip>
+        {(["backlog", "playing", "done", "dropped"] as const).map((s) => (
+          <Chip
+            key={s}
+            active={filters.playState === s}
+            onClick={() => setParam("playState", filters.playState === s ? null : s)}
+          >
+            {playStateLabel(s)}
+            {playCounts[s] ? (
+              <span style={{ opacity: 0.6, marginLeft: 2 }} className="tnum">
+                {playCounts[s]}
+              </span>
+            ) : null}
+          </Chip>
+        ))}
+        {allTags.map((t) => (
+          <Chip
+            key={t.id}
+            active={filters.tag === t.id}
+            onClick={() => setParam("tag", filters.tag === t.id ? null : t.id)}
+            style={t.color ? { borderColor: filters.tag === t.id ? t.color : undefined, color: filters.tag === t.id ? t.color : undefined } : undefined}
+          >
+            # {t.name}
+            <span style={{ opacity: 0.6, marginLeft: 2 }} className="tnum">
+              {t.gameCount}
+            </span>
+          </Chip>
+        ))}
         {topGenres.map((g) => (
           <Chip
             key={g.genre}
@@ -258,6 +291,7 @@ export function LibraryView({
         <GameDetailModal
           game={openGame_}
           accounts={accounts}
+          allTags={allTags}
           onClose={closeModals}
           onMerge={() => openMerge(openGame_.id)}
         />
@@ -331,6 +365,26 @@ function GameCard({ g, onClick }: { g: DerivedGame; onClick: () => void }) {
         {g.isFavorite && (
           <div style={{ position: "absolute", bottom: 8, right: 8, color: "#ffd56b", fontSize: 16 }}>★</div>
         )}
+        {g.playState && (
+          <div
+            style={{
+              position: "absolute",
+              top: 8,
+              left: 8,
+              padding: "2px 7px",
+              fontSize: 9,
+              fontWeight: 700,
+              letterSpacing: 1,
+              textTransform: "uppercase",
+              background: playStateColor(g.playState),
+              color: "#0b0b0f",
+              borderRadius: 3,
+              fontFamily: "var(--font-sans)",
+            }}
+          >
+            {playStateLabel(g.playState)}
+          </div>
+        )}
         {(g.cloudGfn || g.cloudXcloud) && (
           <div
             style={{
@@ -338,43 +392,12 @@ function GameCard({ g, onClick }: { g: DerivedGame; onClick: () => void }) {
               bottom: 8,
               left: 8,
               display: "flex",
-              gap: 4,
+              gap: 6,
+              alignItems: "center",
             }}
           >
-            {g.cloudGfn && (
-              <span
-                title="Available on NVIDIA GeForce Now"
-                style={{
-                  padding: "2px 6px",
-                  fontSize: 9,
-                  fontWeight: 700,
-                  letterSpacing: 0.5,
-                  background: "#76b900",
-                  color: "#0d1700",
-                  borderRadius: 3,
-                  fontFamily: "var(--font-sans)",
-                }}
-              >
-                GFN
-              </span>
-            )}
-            {g.cloudXcloud && (
-              <span
-                title="Available on Xbox Cloud Gaming"
-                style={{
-                  padding: "2px 6px",
-                  fontSize: 9,
-                  fontWeight: 700,
-                  letterSpacing: 0.5,
-                  background: "#107c10",
-                  color: "#fff",
-                  borderRadius: 3,
-                  fontFamily: "var(--font-sans)",
-                }}
-              >
-                xCloud
-              </span>
-            )}
+            {g.cloudGfn && <CloudBadge service="gfn" size={16} />}
+            {g.cloudXcloud && <CloudBadge service="xcloud" size={16} />}
           </div>
         )}
       </div>
@@ -524,4 +547,17 @@ function distinctStores(ids: string[]): string[] {
   const out: string[] = [];
   for (const id of ids) if (!seen.has(id)) { seen.add(id); out.push(id); }
   return out;
+}
+
+export function playStateLabel(s: NonNullable<DerivedGame["playState"]>): string {
+  return { backlog: "Backlog", playing: "Playing", done: "Done", dropped: "Dropped" }[s];
+}
+
+export function playStateColor(s: NonNullable<DerivedGame["playState"]>): string {
+  return {
+    backlog: "#6b8aff",
+    playing: "#22d3ee",
+    done: "#10b981",
+    dropped: "#8a8ea0",
+  }[s];
 }
