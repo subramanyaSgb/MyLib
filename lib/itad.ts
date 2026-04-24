@@ -21,30 +21,29 @@ function region(): { country: string; currency: string } {
   };
 }
 
-type LookupRes = { found?: boolean; game?: { id?: string; slug?: string; title?: string } };
+type LookupRes = {
+  found?: boolean;
+  game?: { id?: string; slug?: string; title?: string };
+};
 
 export async function lookupGameId(title: string): Promise<string | null> {
   const url = new URL(`${ITAD_BASE}/games/lookup/v1`);
   url.searchParams.set("key", key());
   url.searchParams.set("title", title);
   const r = await fetch(url, { headers: { "user-agent": "playdex/1.0" } });
-  if (!r.ok) throw new Error(`ITAD lookup: HTTP ${r.status}`);
+  if (!r.ok) throw new Error(`ITAD lookup ${r.status}: ${await r.text()}`);
   const j = (await r.json()) as LookupRes;
   return j.found && j.game?.id ? j.game.id : null;
 }
 
+type Shop = { id?: number | string; name?: string };
+type Money = { amount?: number; amountInt?: number; currency?: string };
+type Deal = { shop?: Shop; price?: Money; url?: string; cut?: number };
+type HistoryLow = { all?: Money & { shop?: Shop } };
 type PriceEntry = {
   id: string;
-  deals?: Array<{
-    shop?: { id?: string; name?: string };
-    price?: { amount?: number; amountInt?: number; currency?: string };
-    url?: string;
-    cut?: number;
-  }>;
-};
-type HistoryLow = {
-  id: string;
-  history_low?: { all?: { amount?: number; amountInt?: number; currency?: string; shop?: { id?: string; name?: string } } };
+  deals?: Deal[];
+  historyLow?: HistoryLow;
 };
 
 export async function fetchPrices(ids: string[]): Promise<PriceEntry[]> {
@@ -60,35 +59,8 @@ export async function fetchPrices(ids: string[]): Promise<PriceEntry[]> {
     headers: { "content-type": "application/json", "user-agent": "playdex/1.0" },
     body: JSON.stringify(ids),
   });
-  if (!r.ok) throw new Error(`ITAD prices: HTTP ${r.status}`);
+  if (!r.ok) throw new Error(`ITAD prices ${r.status}: ${await r.text()}`);
   return (await r.json()) as PriceEntry[];
-}
-
-export async function fetchHistoryLows(ids: string[]): Promise<Record<string, HistoryLow>> {
-  if (ids.length === 0) return {};
-  const { country } = region();
-  const url = new URL(`${ITAD_BASE}/games/storelow/v2`);
-  url.searchParams.set("key", key());
-  url.searchParams.set("country", country);
-  const r = await fetch(url, {
-    method: "POST",
-    headers: { "content-type": "application/json", "user-agent": "playdex/1.0" },
-    body: JSON.stringify(ids),
-  });
-  if (!r.ok) {
-    const url2 = new URL(`${ITAD_BASE}/games/info/v2`);
-    url2.searchParams.set("key", key());
-    const r2 = await fetch(url2, {
-      method: "POST",
-      headers: { "content-type": "application/json", "user-agent": "playdex/1.0" },
-      body: JSON.stringify(ids),
-    });
-    if (!r2.ok) throw new Error(`ITAD history: HTTP ${r2.status}`);
-    const raw = (await r2.json()) as HistoryLow[];
-    return Object.fromEntries(raw.map((e) => [e.id, e]));
-  }
-  const raw = (await r.json()) as HistoryLow[];
-  return Object.fromEntries(raw.map((e) => [e.id, e]));
 }
 
 export async function syncWishlistDeals(): Promise<{ matched: number; updated: number; missing: number; skipped: number }> {
@@ -97,24 +69,30 @@ export async function syncWishlistDeals(): Promise<{ matched: number; updated: n
     select: { id: true, title: true, currency: true },
   });
 
-  const titleToIds = new Map<string, string>();
+  const titleToId = new Map<string, string | null>();
   let missing = 0;
   const chunks: Array<{ wishlistItemId: string; gameId: string }> = [];
   for (const it of items) {
-    const cached = titleToIds.get(it.title.toLowerCase());
-    const gid = cached ?? (await lookupGameId(it.title));
+    const cacheKey = it.title.toLowerCase();
+    if (!titleToId.has(cacheKey)) {
+      try {
+        titleToId.set(cacheKey, await lookupGameId(it.title));
+      } catch {
+        titleToId.set(cacheKey, null);
+      }
+    }
+    const gid = titleToId.get(cacheKey) ?? null;
     if (!gid) {
       missing++;
       continue;
     }
-    titleToIds.set(it.title.toLowerCase(), gid);
     chunks.push({ wishlistItemId: it.id, gameId: gid });
   }
 
   if (chunks.length === 0) return { matched: 0, updated: 0, missing, skipped: 0 };
 
   const gameIds = [...new Set(chunks.map((c) => c.gameId))];
-  const [prices, lows] = await Promise.all([fetchPrices(gameIds), fetchHistoryLows(gameIds)]);
+  const prices = await fetchPrices(gameIds);
   const priceMap = new Map(prices.map((p) => [p.id, p]));
 
   let updated = 0;
@@ -125,34 +103,40 @@ export async function syncWishlistDeals(): Promise<{ matched: number; updated: n
       skipped++;
       continue;
     }
-    const best = [...entry.deals].sort((a, b) => (a.price?.amountInt ?? Infinity) - (b.price?.amountInt ?? Infinity))[0];
-    const bestCents = best.price?.amountInt ?? (best.price?.amount ? Math.round(best.price.amount * 100) : null);
+    const best = [...entry.deals].sort(
+      (a, b) => (a.price?.amountInt ?? Infinity) - (b.price?.amountInt ?? Infinity),
+    )[0];
+    const bestCents = best.price?.amountInt ?? null;
     if (bestCents == null) {
       skipped++;
       continue;
     }
-    const low = lows[c.gameId]?.history_low?.all;
-    const lowCents = low?.amountInt ?? (low?.amount ? Math.round(low.amount * 100) : null);
+    const low = entry.historyLow?.all;
+    const lowCents = low?.amountInt ?? null;
+
+    const bestShopId = best.shop?.id != null ? String(best.shop.id) : "unknown";
+    const bestShopName = best.shop?.name ?? bestShopId;
+    const lowShopId = low?.shop?.id != null ? String(low.shop.id) : null;
 
     await prisma.externalDeal.upsert({
       where: { wishlistItemId: c.wishlistItemId },
       create: {
         wishlistItemId: c.wishlistItemId,
-        bestShop: best.shop?.id ?? "unknown",
-        bestShopName: best.shop?.name ?? best.shop?.id ?? "Unknown",
+        bestShop: bestShopId,
+        bestShopName,
         bestPriceCents: bestCents,
         bestUrl: best.url ?? null,
         historicalLowCents: lowCents,
-        historicalLowShop: low?.shop?.id ?? null,
+        historicalLowShop: lowShopId,
         currency: best.price?.currency ?? null,
       },
       update: {
-        bestShop: best.shop?.id ?? "unknown",
-        bestShopName: best.shop?.name ?? best.shop?.id ?? "Unknown",
+        bestShop: bestShopId,
+        bestShopName,
         bestPriceCents: bestCents,
         bestUrl: best.url ?? null,
         historicalLowCents: lowCents,
-        historicalLowShop: low?.shop?.id ?? null,
+        historicalLowShop: lowShopId,
         currency: best.price?.currency ?? null,
         fetchedAt: new Date(),
       },
