@@ -6,7 +6,7 @@ import { getSubCoverageForWishlist } from "@/lib/subscriptions";
 export const dynamic = "force-dynamic";
 
 export default async function WishlistPage() {
-  const [items, subCoverage] = await Promise.all([
+  const [items, subCoverage, epicAccountCount] = await Promise.all([
     prisma.wishlistItem.findMany({
       orderBy: [{ isOnSale: "desc" }, { discountPct: "desc" }, { title: "asc" }],
       include: {
@@ -15,6 +15,7 @@ export default async function WishlistPage() {
       },
     }),
     getSubCoverageForWishlist(),
+    prisma.account.count({ where: { storeId: "epic" } }),
   ]);
 
   const onSaleCount = items.filter((i) => i.isOnSale).length;
@@ -40,6 +41,22 @@ export default async function WishlistPage() {
             : `${onSaleCount} on sale · ${belowTargetCount} below your target.`
         }
       />
+      {epicAccountCount > 0 && (
+        <div
+          style={{
+            margin: "0 40px",
+            padding: "10px 14px",
+            border: "1px dashed var(--border)",
+            borderRadius: 6,
+            fontSize: 12,
+            color: "var(--text-faint)",
+            fontFamily: "var(--font-sans)",
+            lineHeight: 1.5,
+          }}
+        >
+          <b style={{ color: "var(--text-soft)" }}>Epic wishlist not synced.</b> Epic's wishlist API sits behind storefront cookies that the launcher OAuth we use doesn't cover — Steam + GOG only for now.
+        </div>
+      )}
       <WishlistView
         items={items.map((i) => ({
           id: i.id,
