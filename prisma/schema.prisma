@@ -186,6 +186,32 @@ model PriceAlert {
   @@index([firedAt])
 }
 
+/// Free-to-claim offer from Epic / GOG / other stores. Refreshed by a sync job.
+model FreeOffer {
+  id          String   @id @default(cuid())
+  storeId     String   // "epic" | "gog" | "steam" | ...
+  /// Store-native product id (Epic offer id, GOG product id, Steam appid).
+  externalId  String
+  title       String
+  coverUrl    String?
+  url         String
+  /// "free_keep" (claim permanently), "free_play" (free weekend / trial),
+  /// "giveaway" (time-bound giveaway), "perma_free" (always free).
+  offerType   String
+  startsAt    DateTime?
+  endsAt      DateTime?
+  /// Price before offer (cents). Null when unknown.
+  originalCents Int?
+  currency    String?
+  fetchedAt   DateTime @default(now())
+  dismissedAt DateTime?
+
+  @@unique([storeId, externalId])
+  @@index([endsAt])
+  @@index([offerType])
+  @@index([dismissedAt])
+}
+
 /// User-created label applied to games ("backlog pile", "coop with Priya", etc.).
 model Tag {
   id        String   @id @default(cuid())

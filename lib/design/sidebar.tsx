@@ -22,6 +22,7 @@ export type SidebarStats = {
   duplicateCount: number;
   wishlistOnSale: number;
   priceAlertCount: number;
+  freeOfferCount: number;
 };
 
 export function Sidebar({
@@ -188,6 +189,22 @@ export function Sidebar({
                   className="tnum"
                 >
                   {stats.priceAlertCount}!
+                </span>
+              ) : r.id === "deals" && stats.freeOfferCount > 0 ? (
+                <span
+                  title={`${stats.freeOfferCount} active free offers`}
+                  style={{
+                    fontSize: 9,
+                    padding: "1px 5px",
+                    background: "var(--accent-soft)",
+                    color: "var(--accent)",
+                    borderRadius: 3,
+                    fontWeight: 700,
+                    letterSpacing: 0.5,
+                  }}
+                  className="tnum"
+                >
+                  {stats.freeOfferCount}
                 </span>
               ) : r.id === "wishlist" && stats.wishlistOnSale > 0 ? (
                 <span

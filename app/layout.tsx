@@ -24,11 +24,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     );
   }
 
-  const [accounts, games, wishlistOnSale, priceAlertCount] = await Promise.all([
+  const [accounts, games, wishlistOnSale, priceAlertCount, freeOfferCount] = await Promise.all([
     getAccounts(),
     getGames({}),
     prisma.wishlistItem.count({ where: { isOnSale: true } }),
     prisma.priceAlert.count({ where: { dismissedAt: null } }),
+    prisma.freeOffer.count({
+      where: {
+        dismissedAt: null,
+        OR: [{ endsAt: null }, { endsAt: { gt: new Date() } }],
+      },
+    }),
   ]);
   const totals = computeTotals(games);
 
@@ -67,6 +73,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               duplicateCount: totals.duplicates.length,
               wishlistOnSale,
               priceAlertCount,
+              freeOfferCount,
             }}
             storeGameCounts={storeGameCounts}
           />
