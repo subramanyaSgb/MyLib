@@ -1,0 +1,102 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+/// Supported stores. Hardcoded enum-ish via string since SQLite lacks enum support.
+model Store {
+  id       String    @id // "steam" | "epic" | "gog" | "stove" | "play"
+  name     String
+  accounts Account[]
+}
+
+/// A linked user account on a store. One user may have MANY accounts per store.
+model Account {
+  id          String   @id @default(cuid())
+  storeId     String
+  store       Store    @relation(fields: [storeId], references: [id])
+  label       String   // user-chosen nickname, e.g. "Main", "Alt"
+  externalId  String?  // SteamID64, Epic account id, GOG user id, etc.
+  displayName String?  // Profile name from store
+  avatarUrl   String?
+  /// Encrypted JSON blob: { apiKey, cookie, token, refreshToken, ... } — per-store shape
+  credsEnc    String
+  createdAt   DateTime @default(now())
+  lastSyncAt  DateTime?
+  lastSyncOk  Boolean  @default(false)
+  lastError   String?
+
+  owned OwnedCopy[]
+
+  @@unique([storeId, externalId])
+  @@index([storeId])
+}
+
+/// Canonical game. Deduplicated across stores by normalized title + optional metadata.
+model Game {
+  id         String   @id @default(cuid())
+  title      String
+  normTitle  String   // lowercased, stripped for dedupe
+  coverUrl   String?
+  releaseYear Int?
+  /// Developer studio (best-of fields across stores).
+  dev        String?
+  /// Primary genre label.
+  genre      String?
+  /// JSON-encoded array of tag/category strings.
+  tagsJson   String?
+  isFavorite Boolean  @default(false)
+  isHidden   Boolean  @default(false)
+  /// When set, treats this Game as "merged" — only the OwnedCopy belonging to
+  /// this Account is shown in the main library; other copies are kept for
+  /// stats but suppressed from the grid.
+  mergedPrimaryAccountId String?
+  createdAt  DateTime @default(now())
+
+  copies      GameOnStore[]
+
+  @@index([normTitle])
+  @@index([isFavorite])
+  @@index([isHidden])
+}
+
+/// A game as it exists on a specific store (has store-specific IDs/art).
+model GameOnStore {
+  id           String @id @default(cuid())
+  gameId       String
+  game         Game   @relation(fields: [gameId], references: [id])
+  storeId      String // "steam" etc — no FK to keep inserts cheap
+  storeGameId  String // appid for Steam, gog product id, etc.
+  storeTitle   String
+  coverUrl     String?
+  storeUrl     String?
+
+  owned OwnedCopy[]
+
+  @@unique([storeId, storeGameId])
+  @@index([gameId])
+}
+
+/// Which account owns which GameOnStore + usage metadata.
+model OwnedCopy {
+  id             String   @id @default(cuid())
+  accountId      String
+  account        Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  gameOnStoreId  String
+  gameOnStore    GameOnStore @relation(fields: [gameOnStoreId], references: [id])
+  playtimeMin    Int      @default(0)
+  lastPlayedAt   DateTime?
+  purchasedAt    DateTime?
+  achievementsUnlocked Int?
+  achievementsTotal    Int?
+  firstSeenAt    DateTime @default(now())
+  lastSeenAt     DateTime @default(now())
+
+  @@unique([accountId, gameOnStoreId])
+  @@index([accountId])
+  @@index([gameOnStoreId])
+}

@@ -1,26 +1,133 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Background layers */
+  --bg: #18140f;
+  --bg-2: #13100c;
+  --bg-3: #1c1814;
+
+  /* Borders */
+  --border: #2a2520;
+  --border-soft: #221e19;
+
+  /* Text */
+  --text: #ece6d8;
+  --text-soft: rgba(236, 230, 216, 0.65);
+  --text-faint: rgba(236, 230, 216, 0.42);
+  --text-whisper: rgba(236, 230, 216, 0.28);
+
+  /* Accent — Amber default. Switchable via [data-accent="teal"|"plum"]. */
+  --accent: oklch(0.72 0.14 58);
+  --accent-soft: oklch(0.72 0.14 58 / 0.14);
+  --accent-ink: #17130d;
+
+  --danger: #ff7a6c;
+
+  /* Type */
+  --font-serif: ui-serif, "Iowan Old Style", "Charter", Georgia, serif;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+[data-accent="teal"] {
+  --accent: oklch(0.70 0.12 195);
+  --accent-soft: oklch(0.70 0.12 195 / 0.14);
+  --accent-ink: #0d1617;
+}
+[data-accent="plum"] {
+  --accent: oklch(0.62 0.15 330);
+  --accent-soft: oklch(0.62 0.15 330 / 0.14);
+  --accent-ink: #15111a;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: var(--bg);
+  --color-foreground: var(--text);
+  --color-bg: var(--bg);
+  --color-bg-2: var(--bg-2);
+  --color-bg-3: var(--bg-3);
+  --color-border: var(--border);
+  --color-border-soft: var(--border-soft);
+  --color-text: var(--text);
+  --color-text-soft: var(--text-soft);
+  --color-text-faint: var(--text-faint);
+  --color-text-whisper: var(--text-whisper);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-sans);
+  --font-serif: var(--font-serif);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  margin: 0;
 }
+
+.serif { font-family: var(--font-serif); }
+.tnum { font-variant-numeric: tabular-nums; }
+.eyebrow {
+  font-size: 10px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  font-family: var(--font-sans);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0 }
+  to { opacity: 1 }
+}
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(8px) }
+  to { opacity: 1; transform: translateY(0) }
+}
+
+.page-enter {
+  animation: fadeIn 0.25s ease, riseIn 0.3s cubic-bezier(.2,.8,.2,1);
+}
+
+.hover-lift {
+  transition: transform 0.18s cubic-bezier(.2,.8,.2,1), filter 0.18s;
+}
+.hover-lift:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter, .hover-lift { animation: none; transition: none; }
+  .hover-lift:hover { transform: none; filter: none; }
+}
+
+/* Buttons / inputs reset */
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+button:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: 1px solid rgba(236, 230, 216, 0.3);
+  outline-offset: 1px;
+}
+select, input, textarea {
+  font-family: inherit;
+  color: inherit;
+}
+
+/* Native scrollbar styling for sidebar */
+.scroll-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+.scroll-thin::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.scroll-thin::-webkit-scrollbar-track { background: transparent; }
