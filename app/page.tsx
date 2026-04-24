@@ -9,7 +9,7 @@ export default async function HomePage() {
   const accountCount = await prisma.account.count();
   if (accountCount === 0) return <EmptyState />;
 
-  const [accounts, games, onSale, biggestSale] = await Promise.all([
+  const [accounts, games, onSale, biggestSale, priceAlerts] = await Promise.all([
     getAccounts(),
     getGames({}),
     prisma.wishlistItem.count({ where: { isOnSale: true } }),
@@ -17,6 +17,26 @@ export default async function HomePage() {
       where: { isOnSale: true },
       orderBy: { discountPct: "desc" },
       select: { title: true, discountPct: true },
+    }),
+    prisma.priceAlert.findMany({
+      where: { dismissedAt: null },
+      orderBy: { firedAt: "desc" },
+      take: 5,
+      include: {
+        wishlistItem: {
+          select: {
+            id: true,
+            storeId: true,
+            title: true,
+            coverUrl: true,
+            storeUrl: true,
+            currency: true,
+            currentPriceCents: true,
+            fullPriceCents: true,
+            targetPriceCents: true,
+          },
+        },
+      },
     }),
   ]);
   const totals = computeTotals(games);
@@ -62,6 +82,24 @@ export default async function HomePage() {
             }
           : null
       }
+      priceAlerts={priceAlerts.map((a) => ({
+        id: a.id,
+        kind: a.kind,
+        priceCents: a.priceCents,
+        targetCents: a.targetCents,
+        prevLowCents: a.prevLowCents,
+        currency: a.currency,
+        item: {
+          id: a.wishlistItem.id,
+          storeId: a.wishlistItem.storeId,
+          title: a.wishlistItem.title,
+          coverUrl: a.wishlistItem.coverUrl,
+          storeUrl: a.wishlistItem.storeUrl,
+          fullPriceCents: a.wishlistItem.fullPriceCents,
+          targetPriceCents: a.wishlistItem.targetPriceCents,
+          currency: a.wishlistItem.currency,
+        },
+      }))}
     />
   );
 }

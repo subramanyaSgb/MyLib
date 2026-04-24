@@ -25,6 +25,25 @@ type DupeHero = {
   copies: Array<{ acc: string; storeId: string; hours: number }>;
 };
 
+type PriceAlert = {
+  id: string;
+  kind: string;
+  priceCents: number;
+  targetCents: number | null;
+  prevLowCents: number | null;
+  currency: string | null;
+  item: {
+    id: string;
+    storeId: string;
+    title: string;
+    coverUrl: string | null;
+    storeUrl: string | null;
+    fullPriceCents: number | null;
+    targetPriceCents: number | null;
+    currency: string | null;
+  };
+};
+
 export function HomeView({
   accounts,
   games,
@@ -33,6 +52,7 @@ export function HomeView({
   biggestSale,
   recent,
   topDupe,
+  priceAlerts,
 }: {
   accounts: DerivedAccount[];
   games: DerivedGame[];
@@ -41,6 +61,7 @@ export function HomeView({
   biggestSale: { title: string; discountPct: number } | null;
   recent: RecentCard[];
   topDupe: DupeHero | null;
+  priceAlerts: PriceAlert[];
 }) {
   const router = useRouter();
   const greetingTime = greeting();
@@ -200,6 +221,36 @@ export function HomeView({
         </div>
       )}
 
+      {/* Price alerts */}
+      {priceAlerts.length > 0 && (
+        <section>
+          <SectionHead
+            title="Price alerts"
+            subtitle={`${priceAlerts.length} wishlist ${priceAlerts.length === 1 ? "item" : "items"} moved`}
+            right={
+              <Link
+                href="/wishlist"
+                style={{
+                  color: "var(--text-faint)",
+                  fontSize: 11,
+                  letterSpacing: 2,
+                  textTransform: "uppercase",
+                  fontFamily: "var(--font-sans)",
+                  textDecoration: "none",
+                }}
+              >
+                Open wishlist →
+              </Link>
+            }
+          />
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 14 }}>
+            {priceAlerts.map((a) => (
+              <PriceAlertRow key={a.id} alert={a} onDismiss={() => router.refresh()} />
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Stat tiles */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
         <StatTile
@@ -357,6 +408,99 @@ function StatTile({
       </div>
     </button>
   );
+}
+
+function PriceAlertRow({ alert, onDismiss }: { alert: PriceAlert; onDismiss: () => void }) {
+  const { item } = alert;
+  const kindLabel = alert.kind === "target_hit" ? "Target hit" : "New low";
+  const kindColor = alert.kind === "target_hit" ? "var(--accent)" : "#64d38c";
+  const now = fmtPrice(alert.priceCents, alert.currency);
+  const was = fmtPrice(item.fullPriceCents ?? alert.prevLowCents, item.currency ?? alert.currency);
+  const target = alert.targetCents != null ? fmtPrice(alert.targetCents, alert.currency) : null;
+
+  async function dismiss() {
+    await fetch(`/api/alerts/${alert.id}/dismiss`, { method: "POST" });
+    onDismiss();
+  }
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: 16,
+        alignItems: "center",
+        padding: 14,
+        border: "1px solid var(--border)",
+        borderLeft: `3px solid ${kindColor}`,
+        borderRadius: 8,
+        background: "var(--bg-2)",
+      }}
+    >
+      <Cover
+        game={{ title: item.title, dev: null, coverUrl: item.coverUrl }}
+        w={48}
+        h={64}
+        radius={4}
+        showTitle={false}
+      />
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <StoreDot id={item.storeId} size={14} />
+          <span
+            style={{
+              fontSize: 10,
+              letterSpacing: 2.5,
+              textTransform: "uppercase",
+              color: kindColor,
+              fontFamily: "var(--font-sans)",
+              fontWeight: 700,
+            }}
+          >
+            {kindLabel}
+          </span>
+        </div>
+        <div style={{ fontSize: 15, fontFamily: "var(--font-serif)", fontWeight: 500, letterSpacing: -0.2 }}>
+          {item.title}
+        </div>
+        <div style={{ fontSize: 12, color: "var(--text-soft)", fontFamily: "var(--font-sans)" }}>
+          <span style={{ textDecoration: "line-through", opacity: 0.55 }}>{was}</span>
+          <span style={{ margin: "0 6px" }}>→</span>
+          <span style={{ color: kindColor, fontWeight: 600 }} className="tnum">
+            {now}
+          </span>
+          {target && (
+            <>
+              <span style={{ margin: "0 8px", opacity: 0.4 }}>·</span>
+              <span>target {target}</span>
+            </>
+          )}
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        {item.storeUrl && (
+          <Btn primary icon="link" onClick={() => window.open(item.storeUrl!, "_blank", "noopener")}>
+            Open store
+          </Btn>
+        )}
+        <Btn ghost onClick={dismiss}>
+          Dismiss
+        </Btn>
+      </div>
+    </div>
+  );
+}
+
+function fmtPrice(cents: number | null, currency: string | null): string {
+  if (cents == null) return "—";
+  const amount = (cents / 100).toFixed(2).replace(/\.00$/, "");
+  const sym =
+    currency === "INR" ? "₹"
+    : currency === "USD" ? "$"
+    : currency === "EUR" ? "€"
+    : currency === "GBP" ? "£"
+    : currency === "JPY" ? "¥"
+    : currency ? `${currency} ` : "$";
+  return `${sym}${amount}`;
 }
 
 function SectionHead({ title, subtitle, right }: { title: string; subtitle?: string; right?: React.ReactNode }) {

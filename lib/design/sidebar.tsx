@@ -21,6 +21,7 @@ export type SidebarStats = {
   totalCopies: number;
   duplicateCount: number;
   wishlistOnSale: number;
+  priceAlertCount: number;
 };
 
 export function Sidebar({
@@ -172,7 +173,23 @@ export function Sidebar({
                   {stats.duplicateCount}
                 </span>
               )}
-              {r.id === "wishlist" && stats.wishlistOnSale > 0 && (
+              {r.id === "wishlist" && stats.priceAlertCount > 0 ? (
+                <span
+                  title={`${stats.priceAlertCount} price alert${stats.priceAlertCount === 1 ? "" : "s"}`}
+                  style={{
+                    fontSize: 9,
+                    padding: "1px 5px",
+                    background: "var(--accent-soft)",
+                    color: "var(--accent)",
+                    borderRadius: 3,
+                    fontWeight: 700,
+                    letterSpacing: 0.5,
+                  }}
+                  className="tnum"
+                >
+                  {stats.priceAlertCount}!
+                </span>
+              ) : r.id === "wishlist" && stats.wishlistOnSale > 0 ? (
                 <span
                   style={{
                     fontSize: 9,
@@ -185,7 +202,7 @@ export function Sidebar({
                 >
                   {stats.wishlistOnSale}↓
                 </span>
-              )}
+              ) : null}
             </Link>
           );
         })}

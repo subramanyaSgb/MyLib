@@ -141,10 +141,49 @@ model WishlistItem {
   addedAt      DateTime @default(now())
   lastSeenAt   DateTime @default(now())
 
+  snapshots    PriceSnapshot[]
+  alerts       PriceAlert[]
+
   @@unique([accountId, storeGameId])
   @@index([accountId])
   @@index([gameId])
   @@index([isOnSale])
+}
+
+/// Price snapshot for a wishlist item — captured each sync so we can detect
+/// "new all-time low" and render history charts.
+model PriceSnapshot {
+  id              String   @id @default(cuid())
+  wishlistItemId  String
+  wishlistItem    WishlistItem @relation(fields: [wishlistItemId], references: [id], onDelete: Cascade)
+  priceCents      Int
+  currency        String?
+  discountPct     Int?
+  capturedAt      DateTime @default(now())
+
+  @@index([wishlistItemId, capturedAt])
+}
+
+/// Alert raised when wishlist price crosses target or hits all-time low.
+model PriceAlert {
+  id              String   @id @default(cuid())
+  wishlistItemId  String
+  wishlistItem    WishlistItem @relation(fields: [wishlistItemId], references: [id], onDelete: Cascade)
+  /// "target_hit" — currentPriceCents <= targetPriceCents
+  /// "new_low"   — currentPriceCents below every prior snapshot
+  kind            String
+  priceCents      Int
+  /// Target at moment of firing (null for new_low).
+  targetCents     Int?
+  /// Previous low at firing time (for context in UI).
+  prevLowCents    Int?
+  currency        String?
+  firedAt         DateTime @default(now())
+  dismissedAt     DateTime?
+
+  @@index([wishlistItemId])
+  @@index([dismissedAt])
+  @@index([firedAt])
 }
 
 /// User-created label applied to games ("backlog pile", "coop with Priya", etc.).

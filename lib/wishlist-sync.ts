@@ -90,11 +90,13 @@ export async function syncWishlistForAccount(accountId: string): Promise<{ added
       gameId: linkedGame?.id ?? null,
       lastSeenAt: new Date(),
     };
+    let wishlistItemId: string;
     if (existing) {
       await prisma.wishlistItem.update({ where: { id: existing.id }, data });
+      wishlistItemId = existing.id;
       updated++;
     } else {
-      await prisma.wishlistItem.create({
+      const created = await prisma.wishlistItem.create({
         data: {
           accountId: account.id,
           storeId: account.storeId,
@@ -102,8 +104,18 @@ export async function syncWishlistForAccount(accountId: string): Promise<{ added
           ...data,
         },
       });
+      wishlistItemId = created.id;
       added++;
     }
+
+    await detectAndRecordPriceChange({
+      wishlistItemId,
+      price: it.currentPriceCents,
+      discountPct: it.discountPct,
+      currency: it.currency,
+      target: existing?.targetPriceCents ?? null,
+      prevPrice: existing?.currentPriceCents ?? null,
+    });
   }
 
   // Drop wishlist entries no longer present.
@@ -116,4 +128,59 @@ export async function syncWishlistForAccount(accountId: string): Promise<{ added
   }
 
   return { added, updated, removed: removed.count, total: items.length };
+}
+
+type PriceChangeInput = {
+  wishlistItemId: string;
+  price: number | null;
+  discountPct: number | null;
+  currency: string | null;
+  target: number | null;
+  prevPrice: number | null;
+};
+
+async function detectAndRecordPriceChange(input: PriceChangeInput): Promise<void> {
+  const { wishlistItemId, price, discountPct, currency, target, prevPrice } = input;
+  if (price == null) return;
+
+  const prevLow = await prisma.priceSnapshot.aggregate({
+    where: { wishlistItemId },
+    _min: { priceCents: true },
+  });
+  const prevLowCents = prevLow._min.priceCents;
+
+  await prisma.priceSnapshot.create({
+    data: { wishlistItemId, priceCents: price, discountPct, currency },
+  });
+
+  const hasActiveTargetAlert = await prisma.priceAlert.findFirst({
+    where: { wishlistItemId, kind: "target_hit", dismissedAt: null },
+    select: { id: true },
+  });
+  if (target != null && price <= target && !hasActiveTargetAlert) {
+    await prisma.priceAlert.create({
+      data: {
+        wishlistItemId,
+        kind: "target_hit",
+        priceCents: price,
+        targetCents: target,
+        prevLowCents,
+        currency,
+      },
+    });
+  }
+
+  const droppedBelowPrevLow = prevLowCents != null && price < prevLowCents;
+  const firstDropFromBaseline = prevLowCents == null && prevPrice != null && price < prevPrice;
+  if (droppedBelowPrevLow || firstDropFromBaseline) {
+    await prisma.priceAlert.create({
+      data: {
+        wishlistItemId,
+        kind: "new_low",
+        priceCents: price,
+        prevLowCents: prevLowCents ?? prevPrice,
+        currency,
+      },
+    });
+  }
 }
