@@ -13,7 +13,7 @@ export const ROUTES: RouteDef[] = [
   { id: "duplicates",   label: "Duplicates",   icon: "dupe",    path: "/duplicates" },
   { id: "wishlist",     label: "Wishlist",     icon: "wish",    path: "/wishlist" },
   { id: "achievements", label: "Achievements", icon: "ach",     path: "/achievements" },
-  { id: "cloud",        label: "Cloud saves",  icon: "cloud",   path: "/cloud" },
+  { id: "cloud",        label: "Cloud gaming", icon: "cloud",   path: "/cloud" },
   { id: "spend",        label: "Spend",        icon: "spend",   path: "/spend" },
   { id: "family",       label: "Family",       icon: "family",  path: "/family" },
   { id: "accounts",     label: "Accounts",     icon: "acc",     path: "/accounts" },

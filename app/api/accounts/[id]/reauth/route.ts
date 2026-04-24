@@ -23,11 +23,29 @@ export async function POST(req: Request, ctx: RouteContext<"/api/accounts/[id]/r
       if (!parsed.data.gogCodeOrUrl) return Response.json({ error: "gogCodeOrUrl required" }, { status: 400 });
       const code = extractGogCode(parsed.data.gogCodeOrUrl);
       const creds = await exchangeCodeForTokens(code);
+      // Reject if the GOG user we just authed is not the one this row was linked to.
+      if (account.externalId && creds.userId !== account.externalId) {
+        return Response.json(
+          {
+            error: `Wrong GOG account — you logged in as a different user. This row is linked to GOG user ${account.externalId}, but you authorized as ${creds.userId}. Open the GOG login URL in an Incognito window and sign in as the correct account.`,
+          },
+          { status: 409 },
+        );
+      }
       credsEnc = encryptJSON(creds);
     } else if (account.storeId === "epic") {
       if (!parsed.data.epicCodeOrJson) return Response.json({ error: "epicCodeOrJson required" }, { status: 400 });
       const code = extractEpicCode(parsed.data.epicCodeOrJson);
       const creds = await exchangeEpicCode(code);
+      // Reject if Epic returned a different account than this row is bound to.
+      if (account.externalId && creds.accountId !== account.externalId) {
+        return Response.json(
+          {
+            error: `Wrong Epic account — your browser is logged in as @${creds.displayName} (${creds.accountId}), but this row is linked to ${account.displayName ?? account.externalId}. Open the Epic login URL in an Incognito window (or log out of Epic in your normal browser first) and sign in as the correct account.`,
+          },
+          { status: 409 },
+        );
+      }
       credsEnc = encryptJSON(creds);
     } else {
       return Response.json({ error: `Re-auth not supported for store ${account.storeId}` }, { status: 400 });

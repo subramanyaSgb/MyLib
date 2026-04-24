@@ -194,6 +194,7 @@ export type EpicGame = {
   genre: string | null;
   year: number | null;
   tags: string[];
+  kind: string | null;
 };
 
 /** Returns BASE GAMES only (filters DLC, addons, plugins, Unreal Engine assets). */
@@ -248,6 +249,11 @@ export async function getOwnedEpicGames(creds: EpicCreds): Promise<EpicGame[]> {
     const releaseStr = item.releaseInfo?.[0]?.dateAdded ?? item.creationDate ?? "";
     const yearMatch = releaseStr.match(/(19|20)\d{2}/);
 
+    // Kind: base game vs anything else.
+    const isBase = item.categories?.some((c) => c.path === "games/edition/base");
+    const isEdition = item.categories?.some((c) => c.path === "games/edition");
+    const kind = isBase ? "game" : isEdition ? "dlc" : "game";
+
     games.push({
       catalogItemId: r.catalogItemId,
       title: item.title,
@@ -257,6 +263,7 @@ export async function getOwnedEpicGames(creds: EpicCreds): Promise<EpicGame[]> {
       genre: genre ? capitalize(genre) : null,
       year: yearMatch ? Number(yearMatch[0]) : null,
       tags: genrePaths.map((p) => capitalize(p.replace(/_/g, " "))).slice(0, 6),
+      kind,
     });
   }
 
@@ -282,9 +289,10 @@ export async function enrichEpicViaStore(title: string): Promise<{
   genre: string | null;
   year: number | null;
   tags: string[];
+  coverUrl: string | null;
 } | null> {
   const body = {
-    query: `query($k:String!,$c:String!,$l:String!){Catalog{searchStore(keywords:$k,country:$c,locale:$l,count:5){elements{id title developerDisplayName publisherDisplayName categories{path} releaseDate}}}}`,
+    query: `query($k:String!,$c:String!,$l:String!){Catalog{searchStore(keywords:$k,country:$c,locale:$l,count:5){elements{id title developerDisplayName publisherDisplayName categories{path} releaseDate keyImages{type url}}}}}`,
     variables: { k: title, c: "US", l: "en-US" },
   };
   let res: Response;
@@ -316,7 +324,14 @@ export async function enrichEpicViaStore(title: string): Promise<{
       };
     };
   };
-  const elements = j.data?.Catalog?.searchStore?.elements ?? [];
+  const elements = (j.data?.Catalog?.searchStore?.elements ?? []) as Array<{
+    title: string;
+    developerDisplayName?: string | null;
+    publisherDisplayName?: string | null;
+    categories?: Array<{ path: string }>;
+    releaseDate?: string | null;
+    keyImages?: Array<{ type: string; url: string }>;
+  }>;
   // Match by exact title (case-insensitive). Fall back to first base-game.
   const norm = (s: string) => s.toLowerCase().replace(/[™®©]/g, "").trim();
   const exact = elements.find((e) => norm(e.title) === norm(title));
@@ -333,10 +348,18 @@ export async function enrichEpicViaStore(title: string): Promise<{
     .map((p) => p.split("/").slice(-1)[0]);
   const genre = genrePaths[0] ? capitalize(genrePaths[0].replace(/_/g, " ")) : null;
   const yearMatch = pick.releaseDate?.match(/(19|20)\d{2}/);
+  const coverUrl =
+    pick.keyImages?.find((i) => i.type === "DieselGameBoxTall")?.url ??
+    pick.keyImages?.find((i) => i.type === "OfferImageTall")?.url ??
+    pick.keyImages?.find((i) => i.type === "DieselStoreFrontTall")?.url ??
+    pick.keyImages?.find((i) => i.type === "Thumbnail")?.url ??
+    pick.keyImages?.[0]?.url ??
+    null;
   return {
     dev,
     genre,
     year: yearMatch ? Number(yearMatch[0]) : null,
     tags: genrePaths.map((p) => capitalize(p.replace(/_/g, " "))).slice(0, 6),
+    coverUrl,
   };
 }

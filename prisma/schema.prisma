@@ -31,6 +31,7 @@ model Account {
   lastError   String?
 
   owned OwnedCopy[]
+  wishlist WishlistItem[]
 
   @@unique([storeId, externalId])
   @@index([storeId])
@@ -49,6 +50,15 @@ model Game {
   genre      String?
   /// JSON-encoded array of tag/category strings.
   tagsJson   String?
+  /// Item kind: "game" | "dlc" | "pack" | "addon" | "music" | "demo" | other.
+  /// Default null (unknown). Library grid hides non-game by default.
+  kind       String?
+  /// Available on NVIDIA GeForce Now cloud streaming.
+  cloudGfn   Boolean  @default(false)
+  /// Available on Xbox Cloud Gaming (PC Game Pass).
+  cloudXcloud Boolean @default(false)
+  /// Last time we cross-referenced this game against cloud catalogs.
+  lastCloudCheckAt DateTime?
   isFavorite Boolean  @default(false)
   isHidden   Boolean  @default(false)
   /// When set, treats this Game as "merged" — only the OwnedCopy belonging to
@@ -58,6 +68,7 @@ model Game {
   createdAt  DateTime @default(now())
 
   copies      GameOnStore[]
+  wishlistItems WishlistItem[]
 
   @@index([normTitle])
   @@index([isFavorite])
@@ -99,4 +110,35 @@ model OwnedCopy {
   @@unique([accountId, gameOnStoreId])
   @@index([accountId])
   @@index([gameOnStoreId])
+}
+
+/// A game on a wishlist (NOT necessarily owned). Per-account so we can tell
+/// which account wants what; deduped to canonical Game when title matches.
+model WishlistItem {
+  id           String   @id @default(cuid())
+  accountId    String
+  account      Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  storeId      String   // "steam" | "gog"
+  storeGameId  String   // appid for Steam, productId for GOG
+  title        String
+  coverUrl     String?
+  storeUrl     String?
+  /// Cents in the store's user-currency (e.g. 1999 = ₹19.99 if Steam region IN).
+  fullPriceCents    Int?
+  currentPriceCents Int?
+  discountPct       Int?     // 0-100
+  currency          String?  // ISO-ish, "USD", "INR" etc. — best-effort.
+  isOnSale          Boolean  @default(false)
+  /// User-set target trigger price.
+  targetPriceCents  Int?
+  /// Optional canonical Game link.
+  gameId       String?
+  game         Game?    @relation(fields: [gameId], references: [id])
+  addedAt      DateTime @default(now())
+  lastSeenAt   DateTime @default(now())
+
+  @@unique([accountId, storeGameId])
+  @@index([accountId])
+  @@index([gameId])
+  @@index([isOnSale])
 }

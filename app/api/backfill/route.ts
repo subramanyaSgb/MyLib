@@ -32,7 +32,7 @@ export async function POST(req: Request) {
     // Steam appdetails
     if (!storeFilter || storeFilter === "steam") {
       const incompleteGames = await prisma.game.findMany({
-        where: { OR: [{ dev: null }, { genre: null }, { releaseYear: null }] },
+        where: { OR: [{ dev: null }, { genre: null }, { releaseYear: null }, { kind: null }] },
         select: { id: true },
       });
       const targets = await prisma.gameOnStore.findMany({
@@ -50,6 +50,7 @@ export async function POST(req: Request) {
                 genre: t.game.genre ?? meta.genre,
                 releaseYear: t.game.releaseYear ?? meta.year,
                 tagsJson: t.game.tagsJson ?? (meta.tags.length ? JSON.stringify(meta.tags) : null),
+                kind: t.game.kind ?? meta.kind,
               },
             });
             metaUpdated++;
@@ -70,7 +71,7 @@ export async function POST(req: Request) {
           gameId: {
             in: (
               await prisma.game.findMany({
-                where: { OR: [{ dev: null }, { genre: null }] },
+                where: { OR: [{ dev: null }, { genre: null }, { coverUrl: null }, { kind: null }] },
                 select: { id: true },
               })
             ).map((g) => g.id),
@@ -81,7 +82,7 @@ export async function POST(req: Request) {
       for (const t of incompleteEpic) {
         try {
           const extra = await enrichEpicViaStore(t.game.title);
-          if (extra && (extra.dev || extra.genre || extra.year)) {
+          if (extra && (extra.dev || extra.genre || extra.year || extra.coverUrl)) {
             await prisma.game.update({
               where: { id: t.gameId },
               data: {
@@ -89,6 +90,7 @@ export async function POST(req: Request) {
                 genre: t.game.genre ?? extra.genre,
                 releaseYear: t.game.releaseYear ?? extra.year,
                 tagsJson: t.game.tagsJson ?? (extra.tags.length ? JSON.stringify(extra.tags) : null),
+                coverUrl: t.game.coverUrl ?? extra.coverUrl,
               },
             });
             metaUpdated++;

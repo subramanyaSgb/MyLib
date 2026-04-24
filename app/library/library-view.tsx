@@ -18,6 +18,7 @@ type Filters = {
   favoritesOnly: boolean;
   showHidden: boolean;
   duplicatesOnly: boolean;
+  cloud: "" | "gfn" | "xcloud" | "any";
   sort: "title" | "recent" | "playtime" | "copies";
   view: "grid" | "list";
 };
@@ -96,7 +97,7 @@ export function LibraryView({
     : `${allCount} unique games · ${totalsCopies} copies · ${accounts.length} accounts`;
 
   const anyFilter =
-    filters.storeId || filters.accountId || filters.genre || filters.played !== "all" || filters.favoritesOnly || filters.duplicatesOnly;
+    filters.storeId || filters.accountId || filters.genre || filters.played !== "all" || filters.favoritesOnly || filters.duplicatesOnly || filters.cloud;
 
   const openGame_ = openGameId ? games.find((g) => g.id === openGameId) ?? null : null;
   const openMerge_ = openMergeId ? games.find((g) => g.id === openMergeId) ?? null : null;
@@ -189,6 +190,18 @@ export function LibraryView({
         </Chip>
         <Chip active={filters.showHidden} onClick={() => toggleParam("showHidden", !filters.showHidden)}>
           Show hidden
+        </Chip>
+        <Chip
+          active={filters.cloud === "gfn"}
+          onClick={() => setParam("cloud", filters.cloud === "gfn" ? null : "gfn")}
+        >
+          On GeForce Now
+        </Chip>
+        <Chip
+          active={filters.cloud === "xcloud"}
+          onClick={() => setParam("cloud", filters.cloud === "xcloud" ? null : "xcloud")}
+        >
+          On xCloud
         </Chip>
         {topGenres.map((g) => (
           <Chip
@@ -317,6 +330,52 @@ function GameCard({ g, onClick }: { g: DerivedGame; onClick: () => void }) {
         )}
         {g.isFavorite && (
           <div style={{ position: "absolute", bottom: 8, right: 8, color: "#ffd56b", fontSize: 16 }}>★</div>
+        )}
+        {(g.cloudGfn || g.cloudXcloud) && (
+          <div
+            style={{
+              position: "absolute",
+              bottom: 8,
+              left: 8,
+              display: "flex",
+              gap: 4,
+            }}
+          >
+            {g.cloudGfn && (
+              <span
+                title="Available on NVIDIA GeForce Now"
+                style={{
+                  padding: "2px 6px",
+                  fontSize: 9,
+                  fontWeight: 700,
+                  letterSpacing: 0.5,
+                  background: "#76b900",
+                  color: "#0d1700",
+                  borderRadius: 3,
+                  fontFamily: "var(--font-sans)",
+                }}
+              >
+                GFN
+              </span>
+            )}
+            {g.cloudXcloud && (
+              <span
+                title="Available on Xbox Cloud Gaming"
+                style={{
+                  padding: "2px 6px",
+                  fontSize: 9,
+                  fontWeight: 700,
+                  letterSpacing: 0.5,
+                  background: "#107c10",
+                  color: "#fff",
+                  borderRadius: 3,
+                  fontFamily: "var(--font-sans)",
+                }}
+              >
+                xCloud
+              </span>
+            )}
+          </div>
         )}
       </div>
       <div

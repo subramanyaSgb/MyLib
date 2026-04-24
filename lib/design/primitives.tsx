@@ -48,35 +48,61 @@ export function Icon({ name, size = 16, opacity = 1, className }: { name: IconNa
 }
 
 // ── StoreDot ───────────────────────────────────────────────────────────────
-export function StoreDot({ id, size = 16, ring = false, title }: { id: string; size?: number; ring?: boolean; title?: string }) {
+// Just the brand SVG in the brand color. No wrapper, no chip, no ring.
+// Over cover art a soft drop-shadow keeps it legible.
+export function StoreDot({ id, size = 16, title }: { id: string; size?: number; ring?: boolean; title?: string }) {
   const s = STORE_PALETTE[id];
   if (!s) {
-    // unknown store fallback: neutral dot with first letter
     return (
       <span
         title={title ?? id}
         style={{
-          display: "inline-flex", alignItems: "center", justifyContent: "center",
-          width: size, height: size, borderRadius: size / 2,
-          background: "#666", color: "#000", fontSize: size * 0.46, fontWeight: 700,
-          flexShrink: 0,
+          display: "inline-block", width: size, height: size,
+          textAlign: "center", lineHeight: `${size}px`,
+          color: "var(--text-faint)", fontSize: size * 0.7, fontWeight: 700,
         }}
       >
         {id[0]?.toUpperCase()}
       </span>
     );
   }
+  if (s.siSlug) {
+    const iconUrl = `https://cdn.simpleicons.org/${s.siSlug}/${s.color.replace("#", "")}`;
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={iconUrl}
+        alt={s.name}
+        title={title ?? s.name}
+        width={size}
+        height={size}
+        style={{
+          display: "inline-block",
+          width: size,
+          height: size,
+          flexShrink: 0,
+          filter: "drop-shadow(0 1px 1.5px rgba(0,0,0,0.5))",
+        }}
+        loading="lazy"
+      />
+    );
+  }
+  // Letter fallback for stores without simple-icons coverage (Stove).
   return (
     <span
       title={title ?? s.name}
       style={{
-        display: "inline-flex", alignItems: "center", justifyContent: "center",
-        width: size, height: size, borderRadius: size / 2,
-        background: s.color, color: s.dark,
-        fontSize: size * 0.46, fontWeight: 700,
+        display: "inline-block",
+        width: size,
+        height: size,
+        lineHeight: `${size}px`,
+        textAlign: "center",
+        color: s.color,
+        fontSize: size * 0.85,
+        fontWeight: 700,
+        letterSpacing: -0.4,
         fontFamily: "var(--font-sans)",
-        flexShrink: 0, letterSpacing: -0.3,
-        boxShadow: ring ? `0 0 0 2px var(--bg), 0 0 0 3px ${s.color}` : "none",
+        textShadow: "0 1px 1.5px rgba(0,0,0,0.5)",
       }}
     >
       {s.letter}

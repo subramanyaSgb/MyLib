@@ -77,16 +77,38 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Fetch upstream
-  const res = await fetch(u);
-  if (!res.ok) return new Response(`upstream ${res.status}`, { status: 502 });
-  const ext = sniffExt(u, res.headers.get("content-type"));
-  const buf = Buffer.from(await res.arrayBuffer());
-  await writeFile(path.join(CACHE_DIR, `${hash}.${ext}`), buf);
-  return new Response(new Uint8Array(buf), {
-    headers: {
-      "content-type": contentTypeFor(ext),
-      "cache-control": "public, max-age=31536000, immutable",
-    },
-  });
+  // Fetch upstream, with Steam-specific fallback chain when first URL 404s.
+  // Steam capsule URLs have a tiered availability:
+  //   library_600x900.jpg  (vertical "library capsule" — many DLC/old games miss this)
+  //   library_hero.jpg     (wide hero)
+  //   header.jpg           (small header — exists for ALL legit apps)
+  //   capsule_616x353.jpg  (medium horizontal)
+  const candidates = [u, ...steamFallbacks(u)];
+
+  for (const candidate of candidates) {
+    const res = await fetch(candidate);
+    if (!res.ok) continue;
+    const ext = sniffExt(candidate, res.headers.get("content-type"));
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.length === 0) continue;
+    await writeFile(path.join(CACHE_DIR, `${hash}.${ext}`), buf);
+    return new Response(new Uint8Array(buf), {
+      headers: {
+        "content-type": contentTypeFor(ext),
+        "cache-control": "public, max-age=31536000, immutable",
+      },
+    });
+  }
+  return new Response("upstream 404", { status: 502 });
+}
+
+function steamFallbacks(u: string): string[] {
+  const m = u.match(/\/steam\/apps\/(\d+)\/(.+)$/);
+  if (!m) return [];
+  const appid = m[1];
+  const tried = m[2];
+  const order = ["library_600x900.jpg", "library_hero.jpg", "header.jpg", "capsule_616x353.jpg", "capsule_231x87.jpg"];
+  return order
+    .filter((f) => f !== tried)
+    .map((f) => `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/${f}`);
 }

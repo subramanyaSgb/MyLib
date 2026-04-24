@@ -24,7 +24,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     );
   }
 
-  const [accounts, games] = await Promise.all([getAccounts(), getGames({})]);
+  const [accounts, games, wishlistOnSale] = await Promise.all([
+    getAccounts(),
+    getGames({}),
+    prisma.wishlistItem.count({ where: { isOnSale: true } }),
+  ]);
   const totals = computeTotals(games);
 
   // Per-store game counts (for sidebar badges).
@@ -60,14 +64,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               totalGames: totals.totalGames,
               totalCopies: totals.totalCopies,
               duplicateCount: totals.duplicates.length,
+              wishlistOnSale,
             }}
             storeGameCounts={storeGameCounts}
           />
           <main style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-            <TopChrome
-              accounts={accounts.map((a) => ({ id: a.id, handle: a.handle }))}
-              lastSyncAt={lastSyncAt}
-            />
+            <TopChrome lastSyncAt={lastSyncAt} />
             <div className="page-enter" style={{ flex: 1 }}>
               {children}
             </div>

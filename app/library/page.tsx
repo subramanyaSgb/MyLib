@@ -17,6 +17,7 @@ export default async function LibraryPage({
     favoritesOnly?: string;
     showHidden?: string;
     duplicatesOnly?: string;
+    cloud?: "gfn" | "xcloud" | "any";
     game?: string;
     merge?: string;
   }>;
@@ -31,6 +32,7 @@ export default async function LibraryPage({
     favoritesOnly: sp.favoritesOnly === "1",
     showHidden: sp.showHidden === "1",
     duplicatesOnly: sp.duplicatesOnly === "1",
+    cloud: sp.cloud ?? "",
     sort: sp.sort ?? "title",
     view: sp.view ?? "grid",
   } as const;
@@ -45,6 +47,7 @@ export default async function LibraryPage({
       unplayed: filters.played === "unplayed",
       favoritesOnly: filters.favoritesOnly,
       showHidden: filters.showHidden,
+      cloudOnly: filters.cloud as "gfn" | "xcloud" | "any" | undefined,
     }),
     getTopGenres(8),
   ]);

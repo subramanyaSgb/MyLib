@@ -29,12 +29,16 @@ export function HomeView({
   accounts,
   games,
   totals,
+  onSaleCount,
+  biggestSale,
   recent,
   topDupe,
 }: {
   accounts: DerivedAccount[];
   games: DerivedGame[];
   totals: DerivedTotals;
+  onSaleCount: number;
+  biggestSale: { title: string; discountPct: number } | null;
   recent: RecentCard[];
   topDupe: DupeHero | null;
 }) {
@@ -211,10 +215,16 @@ export function HomeView({
           onClick={() => router.push("/library?played=unplayed")}
         />
         <StatTile
-          label="Total playtime"
-          value={`${Math.round(totals.totalHours).toLocaleString()}h`}
-          caption={`${totals.totalGames} games · ${totals.totalCopies} copies`}
-          onClick={() => router.push("/library")}
+          label="On sale from wishlist"
+          value={String(onSaleCount)}
+          caption={
+            biggestSale
+              ? `Biggest: ${biggestSale.title}, −${biggestSale.discountPct}%`
+              : onSaleCount === 0
+              ? "Sync wishlist to start tracking"
+              : "Open Wishlist to see all"
+          }
+          onClick={() => router.push("/wishlist")}
         />
       </div>
 

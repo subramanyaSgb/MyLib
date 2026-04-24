@@ -30,6 +30,7 @@ export type NormalizedGame = {
   genre: string | null;
   year: number | null;
   tags: string[];
+  kind: string | null;
   /** Steam-only: pre-fetched per-account achievements. */
   achievementsUnlocked?: number | null;
   achievementsTotal?: number | null;
@@ -107,6 +108,7 @@ async function fetchForAccount(account: {
           genre: meta?.genre ?? null,
           year: meta?.year ?? null,
           tags: meta?.tags ?? [],
+          kind: (meta as { kind?: string | null } | null)?.kind ?? null,
           achievementsUnlocked: ach?.unlocked ?? null,
           achievementsTotal: ach?.total ?? null,
         };
@@ -132,6 +134,7 @@ async function fetchForAccount(account: {
         genre: g.genre,
         year: g.year,
         tags: g.tags,
+        kind: g.kind,
       })),
       updatedCredsEnc: credsChanged ? encryptJSON(creds) : undefined,
     };
@@ -144,7 +147,7 @@ async function fetchForAccount(account: {
     creds = refreshed;
     const raw = await getOwnedEpicGames(creds);
 
-    // Enrich via Epic Store GraphQL for games where catalog returned no dev/genre.
+    // Enrich via Epic Store GraphQL for games where catalog returned no dev/genre/cover.
     // Throttled to 200ms to dodge Cloudflare rate limiting.
     const enriched = [];
     for (const g of raw) {
@@ -152,17 +155,19 @@ async function fetchForAccount(account: {
       let genre = g.genre;
       let year = g.year;
       let tags = g.tags;
-      if (!dev || !genre) {
+      let coverUrl = g.coverUrl;
+      if (!dev || !genre || !coverUrl) {
         const extra = await enrichEpicViaStore(g.title);
         if (extra) {
           dev = dev ?? extra.dev;
           genre = genre ?? extra.genre;
           year = year ?? extra.year;
           if (!tags.length && extra.tags.length) tags = extra.tags;
+          coverUrl = coverUrl ?? extra.coverUrl;
         }
         await sleep(200);
       }
-      enriched.push({ ...g, dev, genre, year, tags });
+      enriched.push({ ...g, dev, genre, year, tags, coverUrl });
     }
 
     return {
@@ -177,6 +182,7 @@ async function fetchForAccount(account: {
         genre: g.genre,
         year: g.year,
         tags: g.tags,
+        kind: g.kind,
       })),
       updatedCredsEnc: credsChanged ? encryptJSON(creds) : undefined,
     };
@@ -226,6 +232,7 @@ export async function syncAccount(accountId: string): Promise<{ added: number; u
           genre: g.genre,
           releaseYear: g.year,
           tagsJson: g.tags.length ? JSON.stringify(g.tags) : null,
+          kind: g.kind,
         },
       });
     } else {
@@ -236,6 +243,7 @@ export async function syncAccount(accountId: string): Promise<{ added: number; u
       if (!game.genre && g.genre) patch.genre = g.genre;
       if (!game.releaseYear && g.year) patch.releaseYear = g.year;
       if (!game.tagsJson && g.tags.length) patch.tagsJson = JSON.stringify(g.tags);
+      if (!game.kind && g.kind) patch.kind = g.kind;
       if (Object.keys(patch).length) {
         game = await prisma.game.update({ where: { id: game.id }, data: patch });
       }

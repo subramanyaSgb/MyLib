@@ -1,0 +1,317 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Cover } from "@/lib/design/cover";
+import { Btn, StoreDot, Icon } from "@/lib/design/primitives";
+import { STORE_PALETTE } from "@/lib/store-meta";
+
+type Item = {
+  id: string;
+  storeId: string;
+  storeGameId: string;
+  title: string;
+  coverUrl: string | null;
+  storeUrl: string | null;
+  fullPriceCents: number | null;
+  currentPriceCents: number | null;
+  discountPct: number | null;
+  currency: string | null;
+  isOnSale: boolean;
+  targetPriceCents: number | null;
+  accountLabel: string;
+  addedAt: string;
+};
+
+function fmtPrice(cents: number | null, currency: string | null): string {
+  if (cents == null) return "—";
+  const amount = (cents / 100).toFixed(2).replace(/\.00$/, "");
+  const sym =
+    currency === "INR" ? "₹"
+    : currency === "USD" ? "$"
+    : currency === "EUR" ? "€"
+    : currency === "GBP" ? "£"
+    : currency === "JPY" ? "¥"
+    : currency ? `${currency} ` : "$";
+  return `${sym}${amount}`;
+}
+
+export function WishlistView({ items }: { items: Item[] }) {
+  const router = useRouter();
+  const [syncing, setSyncing] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  async function syncAll() {
+    setSyncing(true);
+    setMsg("Fetching wishlists…");
+    const r = await fetch("/api/wishlist/sync", { method: "POST" });
+    const j = await r.json();
+    type R = { storeId: string; label: string; ok: boolean; added?: number; updated?: number; removed?: number; total?: number; error?: string };
+    setMsg(
+      (j.results as R[])
+        .map((x) => x.ok ? `${x.storeId}/${x.label}: +${x.added ?? 0} ~${x.updated ?? 0} -${x.removed ?? 0}` : `${x.storeId}/${x.label}: ERR ${x.error}`)
+        .join(" · "),
+    );
+    setSyncing(false);
+    router.refresh();
+  }
+
+  return (
+    <div style={{ padding: "24px 40px 60px", display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <Btn primary icon="cloud" onClick={syncAll} disabled={syncing}>
+          {syncing ? "Syncing…" : "Sync wishlists"}
+        </Btn>
+        {msg && (
+          <span style={{ fontSize: 11.5, color: "var(--text-faint)", fontFamily: "var(--font-sans)" }}>
+            {msg}
+          </span>
+        )}
+      </div>
+
+      {items.length === 0 ? (
+        <div style={{ padding: 40, border: "1px dashed var(--border)", borderRadius: 8, textAlign: "center", color: "var(--text-faint)" }}>
+          Empty. Sync to pull from Steam + GOG.
+        </div>
+      ) : (
+        items.map((it) => <Row key={it.id} it={it} onChanged={() => router.refresh()} />)
+      )}
+    </div>
+  );
+}
+
+function Row({ it, onChanged }: { it: Item; onChanged: () => void }) {
+  const [editingTarget, setEditingTarget] = useState(false);
+  const [targetInput, setTargetInput] = useState(
+    it.targetPriceCents != null ? (it.targetPriceCents / 100).toFixed(2).replace(/\.00$/, "") : "",
+  );
+
+  const m = STORE_PALETTE[it.storeId];
+  const fullCents = it.fullPriceCents ?? 0;
+  const curCents = it.currentPriceCents ?? fullCents;
+  const targetCents = it.targetPriceCents;
+  const belowTarget = targetCents != null && curCents <= targetCents && curCents > 0;
+  const fillPct = fullCents > 0 ? Math.max(2, Math.min(100, (curCents / fullCents) * 100)) : 0;
+  const targetPct = fullCents > 0 && targetCents != null ? Math.max(0, Math.min(100, (targetCents / fullCents) * 100)) : null;
+
+  async function saveTarget() {
+    const cleaned = targetInput.trim();
+    const value = cleaned === "" ? null : Math.round(parseFloat(cleaned) * 100);
+    if (cleaned !== "" && (isNaN(value as number) || (value as number) < 0)) {
+      alert("Bad price");
+      return;
+    }
+    await fetch(`/api/wishlist/${it.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ targetPriceCents: value }),
+    });
+    setEditingTarget(false);
+    onChanged();
+  }
+
+  async function remove() {
+    if (!confirm(`Remove "${it.title}" from local wishlist? (Won't touch your store wishlist — next sync re-adds it.)`)) return;
+    await fetch(`/api/wishlist/${it.id}`, { method: "DELETE" });
+    onChanged();
+  }
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: 16,
+        padding: 16,
+        border: `1px solid ${belowTarget ? "var(--accent)" : "var(--border)"}`,
+        background: belowTarget ? "var(--accent-soft)" : "var(--bg-2)",
+        borderRadius: 8,
+        alignItems: "center",
+      }}
+    >
+      <Cover game={{ title: it.title, dev: null, coverUrl: it.coverUrl }} w={64} h={86} showTitle={false} radius={4} />
+
+      <div style={{ flex: 1, minWidth: 0, fontFamily: "var(--font-sans)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+          <a
+            href={it.storeUrl ?? "#"}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              fontSize: 16,
+              fontFamily: "var(--font-serif)",
+              color: "var(--text)",
+              letterSpacing: -0.3,
+              textDecoration: "none",
+            }}
+          >
+            {it.title}
+          </a>
+          <StoreDot id={it.storeId} size={14} />
+          <span style={{ fontSize: 11, color: "var(--text-faint)" }}>{m?.name ?? it.storeId} · @{it.accountLabel}</span>
+        </div>
+
+        {/* Price bar */}
+        <div style={{ position: "relative", height: 6, background: "var(--border)", borderRadius: 3, overflow: "hidden", marginTop: 6 }}>
+          <div
+            style={{
+              position: "absolute",
+              left: 0,
+              top: 0,
+              height: "100%",
+              width: `${fillPct}%`,
+              background: belowTarget ? "var(--accent)" : "var(--text-faint)",
+            }}
+          />
+          {targetPct != null && (
+            <div
+              title="Your target"
+              style={{
+                position: "absolute",
+                left: `${targetPct}%`,
+                top: -2,
+                bottom: -2,
+                width: 1.5,
+                background: "var(--accent)",
+              }}
+            />
+          )}
+        </div>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            marginTop: 4,
+            fontSize: 11,
+            color: "var(--text-faint)",
+          }}
+          className="tnum"
+        >
+          <span style={{ color: belowTarget ? "var(--accent)" : "var(--text-soft)", fontWeight: 600 }}>
+            {fmtPrice(curCents, it.currency)} now
+          </span>
+          <span>
+            Target{" "}
+            {editingTarget ? (
+              <input
+                value={targetInput}
+                onChange={(e) => setTargetInput(e.target.value)}
+                onBlur={saveTarget}
+                onKeyDown={(e) => { if (e.key === "Enter") saveTarget(); if (e.key === "Escape") setEditingTarget(false); }}
+                autoFocus
+                placeholder="0.00"
+                style={{
+                  width: 60,
+                  padding: "1px 4px",
+                  background: "var(--bg-3)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 3,
+                  color: "var(--text)",
+                  fontSize: 11,
+                  fontFamily: "var(--font-sans)",
+                }}
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setEditingTarget(true)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: targetCents != null ? "var(--accent)" : "var(--text-faint)",
+                  fontSize: 11,
+                  cursor: "pointer",
+                  padding: 0,
+                  textDecoration: "underline dotted",
+                  fontFamily: "var(--font-sans)",
+                }}
+              >
+                {targetCents != null ? fmtPrice(targetCents, it.currency) : "set"}
+              </button>
+            )}
+          </span>
+          <span>{fmtPrice(fullCents, it.currency)} full</span>
+        </div>
+      </div>
+
+      {/* Right block */}
+      <div style={{ width: 120, textAlign: "right", fontFamily: "var(--font-sans)" }}>
+        {it.isOnSale && it.discountPct ? (
+          <>
+            <div
+              style={{
+                fontSize: 10,
+                letterSpacing: 1.5,
+                color: "var(--danger)",
+                textTransform: "uppercase",
+                fontWeight: 700,
+              }}
+            >
+              −{it.discountPct}% off
+            </div>
+            <div
+              style={{
+                fontSize: 22,
+                fontFamily: "var(--font-serif)",
+                color: "var(--accent)",
+                letterSpacing: -0.4,
+                marginTop: 2,
+              }}
+              className="tnum"
+            >
+              {fmtPrice(curCents, it.currency)}
+            </div>
+            {belowTarget && (
+              <div style={{ fontSize: 10, color: "var(--accent)", marginTop: 2 }}>✓ below target</div>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="eyebrow">Watching</div>
+            <div
+              style={{
+                fontSize: 18,
+                fontFamily: "var(--font-serif)",
+                marginTop: 2,
+                color: "var(--text-soft)",
+              }}
+              className="tnum"
+            >
+              {fmtPrice(curCents, it.currency)}
+            </div>
+          </>
+        )}
+        <div style={{ marginTop: 8, display: "flex", gap: 4, justifyContent: "flex-end" }}>
+          {it.storeUrl && (
+            <a
+              href={it.storeUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                padding: "4px 10px",
+                background: belowTarget ? "var(--accent)" : "transparent",
+                color: belowTarget ? "var(--accent-ink)" : "var(--text)",
+                border: belowTarget ? "none" : "1px solid var(--border)",
+                borderRadius: 6,
+                fontSize: 11.5,
+                fontWeight: belowTarget ? 600 : 500,
+                textDecoration: "none",
+              }}
+            >
+              {belowTarget ? "Buy now" : "Open"}
+            </a>
+          )}
+          <button
+            type="button"
+            onClick={remove}
+            title="Remove from local cache"
+            style={{ background: "transparent", border: "none", color: "var(--text-faint)", padding: 4, cursor: "pointer" }}
+          >
+            <Icon name="close" size={12} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

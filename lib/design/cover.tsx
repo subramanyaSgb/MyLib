@@ -124,14 +124,40 @@ export function Cover({
       }}
     >
       {realCover ? (
-        // Use the cached image proxy. object-cover preserves cover art look.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={realCover}
-          alt=""
-          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
-          loading="lazy"
-        />
+        // Two-layer poster fill: blurred copy fills the card (matches palette,
+        // hides letterboxing artifacts), foreground copy is `contain` so wide
+        // header art (Steam header.jpg fallback) shows whole — never stretched.
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={realCover}
+            alt=""
+            aria-hidden
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              filter: "blur(18px) brightness(0.7) saturate(1.1)",
+              transform: "scale(1.15)",
+            }}
+            loading="lazy"
+          />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={realCover}
+            alt=""
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "contain",
+            }}
+            loading="lazy"
+          />
+        </>
       ) : (
         <>
           <div style={{ position: "absolute", inset: 0, background: s.overlay, mixBlendMode: s.blend }} />

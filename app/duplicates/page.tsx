@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getAccounts, getGames, computeTotals } from "@/lib/design/derived";
 import { Cover } from "@/lib/design/cover";
-import { Btn, PageHeader, StoreDot, Avatar, avatarHueFor } from "@/lib/design/primitives";
+import { PageHeader, StoreDot } from "@/lib/design/primitives";
 import { STORE_PALETTE } from "@/lib/store-meta";
 
 export const dynamic = "force-dynamic";
@@ -141,13 +141,9 @@ export default async function DuplicatesPage() {
                                 fontSize: 10.5,
                                 color: "var(--text-faint)",
                                 marginBottom: 4,
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 4,
                               }}
                             >
-                              <Avatar hue={avatarHueFor(a.id)} size={11} label={a.handle[0] ?? "?"} />
-                              <span>@{a.handle}</span>
+                              @{a.handle}
                             </div>
                           )}
                           <div

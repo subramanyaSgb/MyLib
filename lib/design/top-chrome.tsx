@@ -2,22 +2,27 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Icon, Avatar, avatarHueFor } from "./primitives";
-
-export type TopChromeAccount = { id: string; handle: string };
+import { Icon } from "./primitives";
 
 export function TopChrome({
-  accounts,
   lastSyncAt,
 }: {
-  accounts: TopChromeAccount[];
   lastSyncAt: Date | null;
 }) {
   const router = useRouter();
   const [q, setQ] = useState("");
+  const [syncing, setSyncing] = useState(false);
 
-  function syncNow() {
-    fetch("/api/sync-all", { method: "POST" }).then(() => router.refresh());
+  async function syncNow() {
+    setSyncing(true);
+    try {
+      await fetch("/api/sync-all", { method: "POST" });
+      // Also sync wishlists (Steam + GOG)
+      await fetch("/api/wishlist/sync", { method: "POST" });
+      router.refresh();
+    } finally {
+      setSyncing(false);
+    }
   }
 
   function submit(e: React.FormEvent) {
@@ -81,55 +86,33 @@ export function TopChrome({
         </span>
       </form>
 
+      <span style={{ fontSize: 11, color: "var(--text-faint)", fontFamily: "var(--font-sans)" }}>
+        {lastSyncText}
+      </span>
       <button
         type="button"
         onClick={syncNow}
-        title="Sync all accounts now"
+        disabled={syncing}
+        title="Sync every linked account + wishlists"
         style={{
           display: "inline-flex",
           alignItems: "center",
           gap: 6,
-          padding: "6px 10px",
-          background: "transparent",
-          border: "1px solid var(--border)",
+          padding: "6px 12px",
+          background: syncing ? "transparent" : "var(--accent)",
+          color: syncing ? "var(--text-faint)" : "var(--accent-ink)",
+          border: syncing ? "1px solid var(--border)" : "none",
           borderRadius: 6,
-          color: "var(--text-soft)",
           fontSize: 11.5,
+          fontWeight: 600,
           fontFamily: "var(--font-sans)",
+          cursor: syncing ? "wait" : "pointer",
         }}
       >
         <Icon name="cloud" size={12} />
-        <span>{lastSyncText}</span>
+        <span>{syncing ? "Syncing…" : "Sync all"}</span>
       </button>
 
-      <div style={{ display: "flex", alignItems: "center" }}>
-        {accounts.slice(0, 5).map((a, i) => (
-          <div
-            key={a.id}
-            style={{
-              marginLeft: i === 0 ? 0 : -6,
-              border: "2px solid var(--bg)",
-              borderRadius: 99,
-              display: "inline-flex",
-            }}
-          >
-            <Avatar hue={avatarHueFor(a.id)} size={22} label={a.handle[0] ?? "?"} />
-          </div>
-        ))}
-        {accounts.length > 5 && (
-          <span
-            style={{
-              fontSize: 10.5,
-              color: "var(--text-faint)",
-              marginLeft: 6,
-              fontFamily: "var(--font-sans)",
-            }}
-            className="tnum"
-          >
-            +{accounts.length - 5}
-          </span>
-        )}
-      </div>
     </div>
   );
 }

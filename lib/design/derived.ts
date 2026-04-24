@@ -34,6 +34,8 @@ export type DerivedGame = {
   isFavorite: boolean;
   isHidden: boolean;
   mergedPrimaryAccountId: string | null;
+  cloudGfn: boolean;
+  cloudXcloud: boolean;
   /** Synthetic price ($/copy) — used only for "redundant spend" until real prices wired up. */
   price: number;
   /** Visible owners after applying mergedPrimaryAccountId (used for grid display). */
@@ -96,6 +98,7 @@ export async function getGames(filters?: {
   favoritesOnly?: boolean;
   showHidden?: boolean;
   genre?: string;
+  cloudOnly?: "gfn" | "xcloud" | "any";
 }): Promise<DerivedGame[]> {
   const games = await prisma.game.findMany({
     where: {
@@ -103,6 +106,9 @@ export async function getGames(filters?: {
       ...(filters?.favoritesOnly ? { isFavorite: true } : {}),
       ...(filters?.showHidden ? {} : { isHidden: false }),
       ...(filters?.genre ? { genre: filters.genre } : {}),
+      ...(filters?.cloudOnly === "gfn" ? { cloudGfn: true } : {}),
+      ...(filters?.cloudOnly === "xcloud" ? { cloudXcloud: true } : {}),
+      ...(filters?.cloudOnly === "any" ? { OR: [{ cloudGfn: true }, { cloudXcloud: true }] } : {}),
     },
     include: {
       copies: {
@@ -155,6 +161,8 @@ export async function getGames(filters?: {
         isFavorite: g.isFavorite,
         isHidden: g.isHidden,
         mergedPrimaryAccountId: g.mergedPrimaryAccountId,
+        cloudGfn: g.cloudGfn,
+        cloudXcloud: g.cloudXcloud,
         price: SYNTHETIC_PRICE,
         ownedBy,
         allOwners,

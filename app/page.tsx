@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getAccounts, getGames, computeTotals, maxPlayedAccount } from "@/lib/design/derived";
 import { EmptyState } from "@/lib/design/empty-state";
@@ -10,7 +9,16 @@ export default async function HomePage() {
   const accountCount = await prisma.account.count();
   if (accountCount === 0) return <EmptyState />;
 
-  const [accounts, games] = await Promise.all([getAccounts(), getGames({})]);
+  const [accounts, games, onSale, biggestSale] = await Promise.all([
+    getAccounts(),
+    getGames({}),
+    prisma.wishlistItem.count({ where: { isOnSale: true } }),
+    prisma.wishlistItem.findFirst({
+      where: { isOnSale: true },
+      orderBy: { discountPct: "desc" },
+      select: { title: true, discountPct: true },
+    }),
+  ]);
   const totals = computeTotals(games);
 
   const recent = [...games]
@@ -29,6 +37,8 @@ export default async function HomePage() {
       accounts={accounts}
       games={games}
       totals={totals}
+      onSaleCount={onSale}
+      biggestSale={biggestSale ? { title: biggestSale.title, discountPct: biggestSale.discountPct ?? 0 } : null}
       recent={recent.map((g) => {
         const top = maxPlayedAccount(g);
         return {

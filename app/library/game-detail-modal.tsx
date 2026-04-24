@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Cover } from "@/lib/design/cover";
-import { Btn, StoreDot, Avatar, avatarHueFor, Icon } from "@/lib/design/primitives";
+import { Btn, StoreDot, Icon } from "@/lib/design/primitives";
 import type { DerivedAccount, DerivedGame } from "@/lib/design/derived";
 import { STORE_PALETTE } from "@/lib/store-meta";
 
@@ -188,7 +188,6 @@ export function GameDetailModal({
                               gap: 4,
                             }}
                           >
-                            <Avatar hue={avatarHueFor(a.id)} size={12} label={a.handle[0] ?? "?"} />
                             <span>@{a.handle}</span>
                             {a.primary && (
                               <span

@@ -136,6 +136,7 @@ export type GogGame = {
   genre: string | null;
   year: number | null;
   tags: string[];
+  kind: string | null;
 };
 
 /**
@@ -188,6 +189,7 @@ export async function getOwnedGogGames(creds: GogCreds): Promise<GogGame[]> {
       genre: v2?.genre ?? null,
       year: v2?.year ?? null,
       tags: v2?.tags ?? [],
+      kind: v2?.kind ?? null,
     });
     await new Promise((r) => setTimeout(r, 100));
   }
@@ -195,7 +197,80 @@ export async function getOwnedGogGames(creds: GogCreds): Promise<GogGame[]> {
   return games;
 }
 
-type GogV2 = { dev: string | null; genre: string | null; year: number | null; tags: string[] };
+export type GogWishlistItem = {
+  productId: number;
+  title: string;
+  coverUrl: string | null;
+  storeUrl: string;
+  fullPriceCents: number | null;
+  currentPriceCents: number | null;
+  discountPct: number | null;
+  currency: string | null;
+  isOnSale: boolean;
+};
+
+/**
+ * GOG wishlist — embed.gog.com/user/wishlist.json gives ID list, then we
+ * batch-fetch product info + price.
+ */
+export async function getGogWishlist(creds: GogCreds): Promise<GogWishlistItem[]> {
+  const res = await fetch("https://embed.gog.com/user/wishlist.json", { headers: authHeaders(creds) });
+  if (!res.ok) throw new Error(`GOG wishlist HTTP ${res.status}`);
+  const j = (await res.json()) as { wishlist?: Record<string, boolean> };
+  const ids = Object.keys(j.wishlist ?? {}).map(Number).filter((n) => !isNaN(n));
+  if (ids.length === 0) return [];
+
+  const out: GogWishlistItem[] = [];
+  const country = process.env.STORE_REGION ?? "IN";
+  const currency = process.env.STORE_CURRENCY ?? "INR";
+  // Batch /products with prices (override to user's preferred currency).
+  for (let i = 0; i < ids.length; i += 50) {
+    const chunk = ids.slice(i, i + 50);
+    const url = `https://api.gog.com/products?ids=${chunk.join(",")}&expand=title,images,price&countryCode=${country}&currencies=${currency}`;
+    const r = await fetch(url, { headers: authHeaders(creds) });
+    if (!r.ok) throw new Error(`GOG products HTTP ${r.status}`);
+    const items = (await r.json()) as Array<{
+      id: number;
+      title: string;
+      images?: { logo2x?: string; logo?: string; background?: string };
+      links?: { product_card?: string };
+      price?: {
+        baseAmount?: string;
+        finalAmount?: string;
+        amount?: string;
+        symbol?: string;
+        isDiscounted?: boolean;
+        discountPercentage?: string;
+        currencyCode?: string;
+      };
+    }>;
+    for (const it of items) {
+      const raw = it.images?.logo2x ?? it.images?.logo ?? it.images?.background ?? null;
+      const coverUrl = raw ? (raw.startsWith("//") ? `https:${raw}` : raw) : null;
+      const base = it.price?.baseAmount ? Math.round(parseFloat(it.price.baseAmount) * 100) : null;
+      const fin = it.price?.finalAmount
+        ? Math.round(parseFloat(it.price.finalAmount) * 100)
+        : it.price?.amount
+        ? Math.round(parseFloat(it.price.amount) * 100)
+        : null;
+      const disc = it.price?.discountPercentage ? parseInt(it.price.discountPercentage, 10) : 0;
+      out.push({
+        productId: it.id,
+        title: it.title,
+        coverUrl,
+        storeUrl: it.links?.product_card ?? `https://www.gog.com/game/${it.id}`,
+        fullPriceCents: base,
+        currentPriceCents: fin,
+        discountPct: disc || null,
+        currency: it.price?.currencyCode ?? null,
+        isOnSale: !!it.price?.isDiscounted || disc > 0,
+      });
+    }
+  }
+  return out;
+}
+
+type GogV2 = { dev: string | null; genre: string | null; year: number | null; tags: string[]; kind: string | null };
 
 async function fetchGogV2(id: number): Promise<GogV2 | null> {
   try {
@@ -206,21 +281,33 @@ async function fetchGogV2(id: number): Promise<GogV2 | null> {
         developers?: Array<{ name: string }>;
         publisher?: { name: string };
         tags?: Array<{ name: string; level: number }>;
-        product?: { globalReleaseDate?: string; gogReleaseDate?: string };
+        product?: { globalReleaseDate?: string; gogReleaseDate?: string; category?: string };
+        productType?: string;
       };
     };
     const e = j._embedded ?? {};
     const dev = e.developers?.[0]?.name ?? e.publisher?.name ?? null;
-    // Level-1 tag is the broadest genre bucket.
     const level1 = e.tags?.find((t) => t.level === 1);
     const genre = level1?.name ?? null;
     const dateStr = e.product?.globalReleaseDate ?? e.product?.gogReleaseDate ?? "";
     const yearMatch = dateStr.match(/(19|20)\d{2}/);
+    // Map GOG category code → our `kind`. Common values:
+    //  GAME, DLC, PACK, MUSIC, MOVIE, BOOK, EXTRAS
+    const cat = (e.product?.category ?? e.productType ?? "").toUpperCase();
+    let kind: string | null = null;
+    if (cat === "GAME") kind = "game";
+    else if (cat === "DLC") kind = "dlc";
+    else if (cat === "PACK") kind = "pack";
+    else if (cat === "MUSIC") kind = "music";
+    else if (cat === "MOVIE") kind = "movie";
+    else if (cat === "BOOK") kind = "book";
+    else if (cat === "EXTRAS") kind = "extras";
     return {
       dev,
       genre,
       year: yearMatch ? Number(yearMatch[0]) : null,
       tags: e.tags?.map((t) => t.name).slice(0, 8) ?? [],
+      kind,
     };
   } catch {
     return null;

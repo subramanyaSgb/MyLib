@@ -111,6 +111,7 @@ export type SteamAppMeta = {
   genre: string | null;
   year: number | null;
   tags: string[];
+  kind: string | null; // "game" | "dlc" | "demo" | "music" | etc.
 };
 
 /**
@@ -130,6 +131,7 @@ export async function getSteamAppMeta(appid: number): Promise<SteamAppMeta | nul
   const json = (await res.json()) as Record<
     string,
     { success?: boolean; data?: {
+      type?: string;
       developers?: string[];
       genres?: Array<{ description: string }>;
       categories?: Array<{ description: string }>;
@@ -145,6 +147,97 @@ export async function getSteamAppMeta(appid: number): Promise<SteamAppMeta | nul
     genre: d.genres?.[0]?.description ?? null,
     year: yearMatch ? Number(yearMatch[0]) : null,
     tags: (d.genres ?? []).map((g) => g.description).slice(0, 6),
+    kind: d.type ?? null,
+  };
+}
+
+export type SteamWishlistItem = {
+  appid: number;
+  addedAt: Date;
+  title: string;
+  coverUrl: string | null;
+  storeUrl: string;
+  fullPriceCents: number | null;
+  currentPriceCents: number | null;
+  discountPct: number | null;
+  currency: string | null;
+  isOnSale: boolean;
+};
+
+/**
+ * Steam wishlist via IWishlistService (newer Web API; old wishlistdata HTML
+ * endpoint requires session). Returns enriched items with prices via appdetails.
+ */
+export async function getSteamWishlist(steamId64: string): Promise<SteamWishlistItem[]> {
+  const url = `https://api.steampowered.com/IWishlistService/GetWishlist/v1/?steamid=${steamId64}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`GetWishlist HTTP ${res.status}`);
+  const json = (await res.json()) as {
+    response?: { items?: Array<{ appid: number; date_added: number }> };
+  };
+  const items = json.response?.items ?? [];
+  if (items.length === 0) return [];
+
+  const out: SteamWishlistItem[] = [];
+  for (const it of items) {
+    const detail = await getSteamAppDetailsFull(it.appid);
+    out.push({
+      appid: it.appid,
+      addedAt: new Date(it.date_added * 1000),
+      title: detail?.title ?? `App ${it.appid}`,
+      coverUrl: `https://cdn.cloudflare.steamstatic.com/steam/apps/${it.appid}/library_600x900.jpg`,
+      storeUrl: `https://store.steampowered.com/app/${it.appid}`,
+      fullPriceCents: detail?.fullPrice ?? null,
+      currentPriceCents: detail?.currentPrice ?? null,
+      discountPct: detail?.discountPct ?? null,
+      currency: detail?.currency ?? null,
+      isOnSale: (detail?.discountPct ?? 0) > 0,
+    });
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  return out;
+}
+
+async function getSteamAppDetailsFull(appid: number): Promise<{
+  title: string;
+  fullPrice: number | null;
+  currentPrice: number | null;
+  discountPct: number | null;
+  currency: string | null;
+} | null> {
+  // cc forces region for pricing (defaults to IN/INR for this build).
+  const region = (process.env.STORE_REGION ?? "IN").toLowerCase();
+  const url = `https://store.steampowered.com/api/appdetails?appids=${appid}&l=english&cc=${region}`;
+  let res: Response;
+  try {
+    res = await fetch(url, { headers: { "user-agent": "Mylibrary/0.4 (+local)" } });
+  } catch {
+    return null;
+  }
+  if (!res.ok) return null;
+  const j = (await res.json()) as Record<
+    string,
+    { success?: boolean; data?: {
+      name?: string;
+      is_free?: boolean;
+      price_overview?: {
+        currency?: string;
+        initial?: number;
+        final?: number;
+        discount_percent?: number;
+      };
+    } }
+  >;
+  const item = j[String(appid)];
+  if (!item?.success || !item.data) return null;
+  const d = item.data;
+  const p = d.price_overview;
+  return {
+    title: d.name ?? `App ${appid}`,
+    fullPrice: p?.initial ?? (d.is_free ? 0 : null),
+    currentPrice: p?.final ?? (d.is_free ? 0 : null),
+    discountPct: p?.discount_percent ?? 0,
+    currency: p?.currency ?? null,
   };
 }
 

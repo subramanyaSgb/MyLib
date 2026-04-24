@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useSearchParams, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { Icon, StoreDot, Avatar, avatarHueFor } from "./primitives";
+import { Icon, StoreDot } from "./primitives";
 import { ROUTES } from "./routes";
 import { STORE_PALETTE } from "@/lib/store-meta";
 
@@ -20,6 +20,7 @@ export type SidebarStats = {
   totalGames: number;
   totalCopies: number;
   duplicateCount: number;
+  wishlistOnSale: number;
 };
 
 export function Sidebar({
@@ -171,6 +172,20 @@ export function Sidebar({
                   {stats.duplicateCount}
                 </span>
               )}
+              {r.id === "wishlist" && stats.wishlistOnSale > 0 && (
+                <span
+                  style={{
+                    fontSize: 9,
+                    padding: "1px 5px",
+                    background: "rgba(255,255,255,0.05)",
+                    color: "var(--text-faint)",
+                    borderRadius: 3,
+                  }}
+                  className="tnum"
+                >
+                  {stats.wishlistOnSale}↓
+                </span>
+              )}
             </Link>
           );
         })}
@@ -278,7 +293,7 @@ export function Sidebar({
                             background: sel ? "var(--accent)" : "var(--border)",
                           }}
                         />
-                        <Avatar hue={avatarHueFor(a.id)} size={16} label={a.handle[0] ?? "?"} />
+                        <StoreDot id={a.storeId} size={14} />
                         <div
                           style={{
                             flex: 1,

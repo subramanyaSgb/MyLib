@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Btn, PageHeader, StoreDot, Avatar, avatarHueFor, Icon, Chip } from "@/lib/design/primitives";
+import { Btn, PageHeader, StoreDot, Icon } from "@/lib/design/primitives";
 import { STORE_PALETTE } from "@/lib/store-meta";
 
 type Account = {
@@ -250,7 +250,7 @@ export default function AccountsPage() {
                           }}
                         >
                           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-                            <Avatar hue={avatarHueFor(a.id)} size={32} label={handle[0] ?? "?"} />
+                            <StoreDot id={a.storeId} size={32} />
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div
                                 style={{
@@ -402,6 +402,19 @@ export default function AccountsPage() {
             <div style={{ fontSize: 12, color: "var(--text-soft)", lineHeight: 1.5 }}>
               Token expired. Re-authorize without losing your library — owned games stay; only credentials refresh.
             </div>
+            <div
+              style={{
+                fontSize: 11.5,
+                color: "var(--accent)",
+                background: "var(--accent-soft)",
+                border: "1px solid var(--accent)",
+                borderRadius: 6,
+                padding: "8px 10px",
+                lineHeight: 1.45,
+              }}
+            >
+              <strong>Important — multi-account caveat:</strong> {STORE_PALETTE[reauthOpen.storeId]?.name} login uses your browser session. If you're logged into a <em>different</em> {STORE_PALETTE[reauthOpen.storeId]?.name} account in your normal browser, this re-link will return that account&apos;s tokens — and will be rejected. Open the login URL in an <strong>Incognito / Private window</strong>, sign in as <code>{reauthOpen.label}</code>, then paste the code here.
+            </div>
             <ol style={olStyle}>
               <li>
                 Open {STORE_PALETTE[reauthOpen.storeId]?.name} login.{" "}
@@ -503,6 +516,21 @@ export default function AccountsPage() {
 
             {addOpen === "gog" && (
               <form onSubmit={addGog} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {grouped.gog?.length > 0 && (
+                  <div
+                    style={{
+                      fontSize: 11.5,
+                      color: "var(--accent)",
+                      background: "var(--accent-soft)",
+                      border: "1px solid var(--accent)",
+                      borderRadius: 6,
+                      padding: "8px 10px",
+                      lineHeight: 1.45,
+                    }}
+                  >
+                    Adding a <strong>second</strong> GOG account? Open the login URL in an <strong>Incognito / Private window</strong> — otherwise you&apos;ll re-auth your existing GOG account.
+                  </div>
+                )}
                 <ol style={olStyle}>
                   <li>
                     Open GOG login.{" "}
@@ -540,6 +568,21 @@ export default function AccountsPage() {
 
             {addOpen === "epic" && (
               <form onSubmit={addEpic} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {grouped.epic?.length > 0 && (
+                  <div
+                    style={{
+                      fontSize: 11.5,
+                      color: "var(--accent)",
+                      background: "var(--accent-soft)",
+                      border: "1px solid var(--accent)",
+                      borderRadius: 6,
+                      padding: "8px 10px",
+                      lineHeight: 1.45,
+                    }}
+                  >
+                    Adding a <strong>second</strong> Epic account? Open the login URL in an <strong>Incognito / Private window</strong> — otherwise Epic re-auths your already-linked account and the add will be rejected as duplicate.
+                  </div>
+                )}
                 <ol style={olStyle}>
                   <li>
                     Open Epic login.{" "}
