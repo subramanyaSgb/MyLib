@@ -3,6 +3,7 @@ import { getAccounts, getGames, computeTotals } from "@/lib/design/derived";
 import { Cover } from "@/lib/design/cover";
 import { PageHeader, StoreDot } from "@/lib/design/primitives";
 import { STORE_PALETTE } from "@/lib/store-meta";
+import { computeRefund } from "@/lib/refund";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,14 @@ export default async function DuplicatesPage() {
   const totals = computeTotals(games);
   const accById = Object.fromEntries(accounts.map((a) => [a.id, a]));
   const sorted = [...totals.duplicates].sort((a, b) => b.allOwners.length - a.allOwners.length);
+  let refundableCopies = 0;
+  for (const g of sorted) {
+    const bestOwner = g.allOwners.reduce((a, o) => (o.hours > a.hours ? o : a), g.allOwners[0]);
+    for (const o of g.allOwners) {
+      if (o === bestOwner) continue;
+      if (computeRefund(o).eligible) refundableCopies++;
+    }
+  }
 
   return (
     <div>
@@ -24,7 +33,7 @@ export default async function DuplicatesPage() {
             </span>
           </>
         }
-        subtitle={`You spent roughly $${totals.dupeSavings.toFixed(0)} buying these games more than once. Merge to consolidate playtime into your primary copy.`}
+        subtitle={`You spent roughly $${totals.dupeSavings.toFixed(0)} buying these games more than once. Merge to consolidate playtime into your primary copy.${refundableCopies > 0 ? ` ${refundableCopies} duplicate cop${refundableCopies === 1 ? "y is" : "ies are"} still inside the refund window.` : ""}`}
       />
       {sorted.length === 0 ? (
         <div style={{ padding: "60px 40px", textAlign: "center", color: "var(--text-faint)" }}>
@@ -92,6 +101,7 @@ export default async function DuplicatesPage() {
                       const a = accById[o.acc];
                       const s = STORE_PALETTE[o.storeId];
                       const isBest = o === best && o.hours > 0;
+                      const refund = computeRefund(o);
                       return (
                         <div
                           key={i}
@@ -132,6 +142,23 @@ export default async function DuplicatesPage() {
                                 }}
                               >
                                 PRIMARY
+                              </span>
+                            )}
+                            {!isBest && refund.eligible && (
+                              <span
+                                title={`${refund.rule.summary}${refund.basisIsHeuristic ? " (window estimated from first-seen date)" : ""}`}
+                                style={{
+                                  fontSize: 8,
+                                  padding: "1px 4px",
+                                  background: "#2d7d46",
+                                  color: "#fff",
+                                  borderRadius: 2,
+                                  fontWeight: 700,
+                                  letterSpacing: 0.5,
+                                  marginLeft: "auto",
+                                }}
+                              >
+                                REFUND · {refund.daysLeft}d
                               </span>
                             )}
                           </div>

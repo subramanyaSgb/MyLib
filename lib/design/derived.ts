@@ -16,8 +16,11 @@ export type DerivedOwner = {
   acc: string;
   storeId: string;
   hours: number;
+  playtimeMin: number;
   lastPlayed: string;        // humanized
   lastPlayedAt: Date | null; // raw for sorting
+  firstSeenAt: Date;
+  purchasedAt: Date | null;
   achievements: string | null;     // "N/M" if known
   achievementsPct: number | null;  // 0..100
   preorder: boolean;
@@ -136,8 +139,11 @@ export async function getGames(filters?: {
             acc: o.account.id,
             storeId: o.account.storeId,
             hours: Number((o.playtimeMin / 60).toFixed(1)),
+            playtimeMin: o.playtimeMin,
             lastPlayed: humanizeDate(o.lastPlayedAt),
             lastPlayedAt: o.lastPlayedAt,
+            firstSeenAt: o.firstSeenAt,
+            purchasedAt: o.purchasedAt,
             achievements: hasAch ? `${o.achievementsUnlocked ?? 0}/${o.achievementsTotal}` : null,
             achievementsPct: hasAch
               ? Math.round(((o.achievementsUnlocked ?? 0) / (o.achievementsTotal as number)) * 100)
