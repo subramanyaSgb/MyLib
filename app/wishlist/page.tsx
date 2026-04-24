@@ -9,6 +9,7 @@ export default async function WishlistPage() {
     orderBy: [{ isOnSale: "desc" }, { discountPct: "desc" }, { title: "asc" }],
     include: {
       account: { select: { id: true, storeId: true, label: true, displayName: true } },
+      externalDeal: true,
     },
   });
 
@@ -51,6 +52,17 @@ export default async function WishlistPage() {
           targetPriceCents: i.targetPriceCents,
           accountLabel: i.account.displayName ?? i.account.label,
           addedAt: i.addedAt.toISOString(),
+          externalDeal: i.externalDeal
+            ? {
+                bestShop: i.externalDeal.bestShop,
+                bestShopName: i.externalDeal.bestShopName,
+                bestPriceCents: i.externalDeal.bestPriceCents,
+                bestUrl: i.externalDeal.bestUrl,
+                historicalLowCents: i.externalDeal.historicalLowCents,
+                historicalLowShop: i.externalDeal.historicalLowShop,
+                currency: i.externalDeal.currency,
+              }
+            : null,
         }))}
       />
     </div>

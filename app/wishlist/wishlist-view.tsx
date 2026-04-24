@@ -6,6 +6,16 @@ import { Cover } from "@/lib/design/cover";
 import { Btn, StoreDot, Icon } from "@/lib/design/primitives";
 import { STORE_PALETTE } from "@/lib/store-meta";
 
+type ExternalDeal = {
+  bestShop: string;
+  bestShopName: string;
+  bestPriceCents: number;
+  bestUrl: string | null;
+  historicalLowCents: number | null;
+  historicalLowShop: string | null;
+  currency: string | null;
+};
+
 type Item = {
   id: string;
   storeId: string;
@@ -21,6 +31,7 @@ type Item = {
   targetPriceCents: number | null;
   accountLabel: string;
   addedAt: string;
+  externalDeal: ExternalDeal | null;
 };
 
 function fmtPrice(cents: number | null, currency: string | null): string {
@@ -56,11 +67,31 @@ export function WishlistView({ items }: { items: Item[] }) {
     router.refresh();
   }
 
+  async function refreshDeals() {
+    setSyncing(true);
+    setMsg("Looking up ITAD deals…");
+    const r = await fetch("/api/deals/refresh", { method: "POST" });
+    if (r.status === 412) {
+      const j = await r.json();
+      setMsg(j.error ?? "ITAD_API_KEY missing");
+    } else if (!r.ok) {
+      setMsg(`Error ${r.status}`);
+    } else {
+      const j = (await r.json()) as { matched: number; updated: number; missing: number; skipped: number };
+      setMsg(`ITAD: matched ${j.matched}, updated ${j.updated}, missing ${j.missing}, skipped ${j.skipped}`);
+    }
+    setSyncing(false);
+    router.refresh();
+  }
+
   return (
     <div style={{ padding: "24px 40px 60px", display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <Btn primary icon="cloud" onClick={syncAll} disabled={syncing}>
           {syncing ? "Syncing…" : "Sync wishlists"}
+        </Btn>
+        <Btn icon="trend" onClick={refreshDeals} disabled={syncing}>
+          {syncing ? "…" : "Refresh deals"}
         </Btn>
         {msg && (
           <span style={{ fontSize: 11.5, color: "var(--text-faint)", fontFamily: "var(--font-sans)" }}>
@@ -231,6 +262,10 @@ function Row({ it, onChanged }: { it: Item; onChanged: () => void }) {
           </span>
           <span>{fmtPrice(fullCents, it.currency)} full</span>
         </div>
+
+        {it.externalDeal && it.externalDeal.bestPriceCents < curCents && (
+          <DealBadge deal={it.externalDeal} currentCents={curCents} />
+        )}
       </div>
 
       {/* Right block */}
@@ -312,6 +347,69 @@ function Row({ it, onChanged }: { it: Item; onChanged: () => void }) {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function DealBadge({ deal, currentCents }: { deal: ExternalDeal; currentCents: number }) {
+  const saving = currentCents - deal.bestPriceCents;
+  const savingPct = currentCents > 0 ? Math.round((saving / currentCents) * 100) : 0;
+  const atHistoricalLow = deal.historicalLowCents != null && deal.bestPriceCents <= deal.historicalLowCents;
+  return (
+    <div
+      style={{
+        marginTop: 8,
+        padding: "6px 10px",
+        border: "1px solid var(--border-soft)",
+        borderRadius: 6,
+        background: "var(--bg-3)",
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        fontSize: 11.5,
+        fontFamily: "var(--font-sans)",
+      }}
+    >
+      <span style={{ color: "var(--text-faint)", letterSpacing: 1, textTransform: "uppercase", fontSize: 9 }}>
+        Cheaper on
+      </span>
+      <span style={{ color: "var(--text)", fontWeight: 600 }}>{deal.bestShopName}</span>
+      <span className="tnum" style={{ color: "#64d38c", fontWeight: 700 }}>
+        {fmtPrice(deal.bestPriceCents, deal.currency ?? null)}
+      </span>
+      <span style={{ color: "var(--text-faint)" }}>
+        save {fmtPrice(saving, deal.currency ?? null)} ({savingPct}%)
+      </span>
+      {atHistoricalLow && (
+        <span
+          style={{
+            marginLeft: "auto",
+            fontSize: 9,
+            letterSpacing: 1,
+            textTransform: "uppercase",
+            color: "var(--accent)",
+            fontWeight: 700,
+          }}
+        >
+          ★ All-time low
+        </span>
+      )}
+      {deal.bestUrl && (
+        <a
+          href={deal.bestUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            marginLeft: atHistoricalLow ? 12 : "auto",
+            color: "var(--accent)",
+            textDecoration: "none",
+            fontSize: 11,
+            fontWeight: 600,
+          }}
+        >
+          View →
+        </a>
+      )}
     </div>
   );
 }

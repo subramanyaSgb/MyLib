@@ -143,6 +143,7 @@ model WishlistItem {
 
   snapshots    PriceSnapshot[]
   alerts       PriceAlert[]
+  externalDeal ExternalDeal?
 
   @@unique([accountId, storeGameId])
   @@index([accountId])
@@ -184,6 +185,27 @@ model PriceAlert {
   @@index([wishlistItemId])
   @@index([dismissedAt])
   @@index([firedAt])
+}
+
+/// Cross-store deal for a wishlist item, sourced from IsThereAnyDeal. Tracks
+/// the current cheapest offer across all supported stores plus the all-time
+/// low seen by ITAD (for "can still go lower" signals).
+model ExternalDeal {
+  id              String   @id @default(cuid())
+  wishlistItemId  String   @unique
+  wishlistItem    WishlistItem @relation(fields: [wishlistItemId], references: [id], onDelete: Cascade)
+  /// Shop identifier as returned by ITAD (e.g. "steam", "gog", "epic", "humblestore").
+  bestShop        String
+  bestShopName    String
+  bestPriceCents  Int
+  bestUrl         String?
+  /// Historical low seen by ITAD across all shops.
+  historicalLowCents Int?
+  historicalLowShop  String?
+  currency        String?
+  fetchedAt       DateTime @default(now())
+
+  @@index([wishlistItemId])
 }
 
 /// Free-to-claim offer from Epic / GOG / other stores. Refreshed by a sync job.
