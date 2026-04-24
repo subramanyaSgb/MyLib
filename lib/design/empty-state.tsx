@@ -55,7 +55,7 @@ export function EmptyState() {
             marginInline: "auto",
           }}
         >
-          Connect your store accounts — Steam, Epic, GOG, and more — and Mylibrary
+          Connect your store accounts — Steam, Epic, GOG, and more — and Playdex
           will pull every game you own into one shelf. Multiple accounts per store welcome.
         </div>
         <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>

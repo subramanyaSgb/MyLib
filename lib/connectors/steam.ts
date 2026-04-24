@@ -123,7 +123,7 @@ export async function getSteamAppMeta(appid: number): Promise<SteamAppMeta | nul
   const url = `https://store.steampowered.com/api/appdetails?appids=${appid}&l=english`;
   let res: Response;
   try {
-    res = await fetch(url, { headers: { "user-agent": "Mylibrary/0.4 (+local)" } });
+    res = await fetch(url, { headers: { "user-agent": "Playdex/0.4 (+local)" } });
   } catch {
     return null;
   }
@@ -210,7 +210,7 @@ async function getSteamAppDetailsFull(appid: number): Promise<{
   const url = `https://store.steampowered.com/api/appdetails?appids=${appid}&l=english&cc=${region}`;
   let res: Response;
   try {
-    res = await fetch(url, { headers: { "user-agent": "Mylibrary/0.4 (+local)" } });
+    res = await fetch(url, { headers: { "user-agent": "Playdex/0.4 (+local)" } });
   } catch {
     return null;
   }

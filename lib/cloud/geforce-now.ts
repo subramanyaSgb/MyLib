@@ -48,7 +48,7 @@ export async function fetchGfnCatalog(): Promise<GfnEntry[]> {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Mylibrary/0.4",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Playdex/0.4",
         origin: "https://www.nvidia.com",
         referer: `https://www.nvidia.com/en-${country.toLowerCase()}/geforce-now/games/`,
       },

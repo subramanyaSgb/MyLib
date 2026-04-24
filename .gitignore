@@ -46,3 +46,12 @@ next-env.d.ts
 /prisma/dev.db
 /prisma/dev.db-journal
 
+# code-review-graph cache
+/.code-review-graph/
+
+# editor / os
+.idea/
+.vscode/
+Thumbs.db
+ehthumbs.db
+

@@ -301,7 +301,7 @@ export async function enrichEpicViaStore(title: string): Promise<{
       method: "POST",
       headers: {
         "content-type": "application/json",
-        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Mylibrary/0.4",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Playdex/0.4",
       },
       body: JSON.stringify(body),
     });

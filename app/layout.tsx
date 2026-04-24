@@ -6,7 +6,7 @@ import { Sidebar } from "@/lib/design/sidebar";
 import { TopChrome } from "@/lib/design/top-chrome";
 
 export const metadata: Metadata = {
-  title: "Mylibrary — unified game library",
+  title: "Playdex — unified game library",
   description: "One library across every store you've ever used.",
 };
 

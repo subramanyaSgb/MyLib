@@ -55,7 +55,7 @@ export default function SettingsPage() {
         </Group>
 
         <Group title="Privacy">
-          <Row label="Send anonymous usage data" sub="Off. Mylibrary doesn't phone home.">
+          <Row label="Send anonymous usage data" sub="Off. Playdex doesn't phone home.">
             <Toggle on={analytics} onChange={setAnalytics} />
           </Row>
           <Row label="Delete all data" sub="Removes accounts, library cache, and image cache. Cannot be undone." danger>

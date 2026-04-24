@@ -100,10 +100,10 @@ export function Sidebar({
             fontStyle: "italic",
           }}
         >
-          M
+          P
         </div>
         <div style={{ fontSize: 16, fontWeight: 600, letterSpacing: -0.2, fontFamily: "var(--font-serif)" }}>
-          Mylibrary
+          Playdex
         </div>
         <div
           style={{

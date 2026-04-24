@@ -112,7 +112,7 @@ export function OnboardingFlow({
               letterSpacing: -0.2,
             }}
           >
-            Mylibrary
+            Playdex
           </div>
         </div>
 
@@ -419,7 +419,7 @@ function StepSecondAccount({
         }}
       >
         An old one from college. A second login for Family Sharing. A backup with the indie-bundle haul.{" "}
-        <b style={{ color: "var(--text)" }}>This is the reason Mylibrary exists</b> — link both and we'll stitch the libraries into one.
+        <b style={{ color: "var(--text)" }}>This is the reason Playdex exists</b> — link both and we'll stitch the libraries into one.
       </div>
 
       <div
@@ -679,7 +679,7 @@ function StepDone({
           : "Add another account on a store you already use to find overlaps. The duplicates view will surface them automatically."}
       </div>
       <Btn primary onClick={onEnter} style={{ padding: "10px 18px", fontSize: 13 }}>
-        Enter Mylibrary →
+        Enter Playdex →
       </Btn>
     </div>
   );

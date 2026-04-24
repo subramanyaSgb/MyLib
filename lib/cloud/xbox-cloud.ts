@@ -19,7 +19,7 @@ export type XcloudEntry = {
 export async function fetchXcloudCatalog(): Promise<XcloudEntry[]> {
   const siglRes = await fetch(
     `https://catalog.gamepass.com/sigls/v2?id=${SIGL_ALL_CONSOLE}&language=en-us&market=US`,
-    { headers: { "user-agent": "Mylibrary/0.4" }, cache: "no-store" },
+    { headers: { "user-agent": "Playdex/0.4" }, cache: "no-store" },
   );
   if (!siglRes.ok) throw new Error(`xCloud SIGL HTTP ${siglRes.status}`);
   const sigl = (await siglRes.json()) as Array<{ id?: string; siglId?: string; title?: string }>;
@@ -31,7 +31,7 @@ export async function fetchXcloudCatalog(): Promise<XcloudEntry[]> {
   for (let i = 0; i < bigIds.length; i += 25) {
     const chunk = bigIds.slice(i, i + 25);
     const url = `https://displaycatalog.mp.microsoft.com/v7.0/products?bigIds=${chunk.join(",")}&market=US&languages=en-US`;
-    const res = await fetch(url, { headers: { "user-agent": "Mylibrary/0.4" }, cache: "no-store" });
+    const res = await fetch(url, { headers: { "user-agent": "Playdex/0.4" }, cache: "no-store" });
     if (!res.ok) continue;
     const j = (await res.json()) as {
       Products?: Array<{
